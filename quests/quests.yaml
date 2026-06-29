@@ -1,1 +1,30 @@
-quests: []
+quests:
+  - id: "1"
+    module: voice
+    title: "Voice"
+    subtitle: "讓你的 Agent 說出第一句話！"
+    tag: "新手村起點"
+  - id: "2"
+    module: brain
+    title: "Brain"
+    subtitle: "替 Agent 裝上大腦"
+  - id: "3"
+    module: memory
+    title: "Memory"
+    subtitle: "替 Agent 裝上記憶"
+  - id: "4"
+    module: identity
+    title: "Identity"
+    subtitle: "建立 Agent 身份"
+  - id: "5"
+    module: tools
+    title: "Tools"
+    subtitle: "裝備 Agent 工具"
+  - id: "6"
+    module: planning
+    title: "Planning"
+    subtitle: "教 Agent 規劃"
+  - id: "7"
+    module: team
+    title: "Team"
+    subtitle: "組建 Agent 團隊"
