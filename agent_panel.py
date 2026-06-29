@@ -15,7 +15,7 @@ from openai_tts import Settings, stream_tts_play
 from openai_tts.settings import MAX_TTS_SPEED, MIN_TTS_SPEED
 from st_multimodal_chatinput import multimodal_chatinput
 
-from auth.session import get_auth_user
+from shell_ui import inject_multimodal_chatinput_theme_fix
 from bootstrap_config import (
     DEFAULT_TTS_BASE_URL,
     DEFAULT_TTS_MODEL,
@@ -866,6 +866,18 @@ def _restore_agent_core_if_possible(session_name: str) -> tuple[bool, str | None
     return False, message
 
 
+def append_assistant_message(text: str) -> None:
+    """Append a non-LLM assistant line (e.g. Forge Lab stdout) to chat history."""
+    message = text.strip()
+    if not message:
+        return
+    history = st.session_state.get("studio_chat_history")
+    if not isinstance(history, list):
+        history = []
+    history.append(("assistant", message, ""))
+    st.session_state["studio_chat_history"] = history
+
+
 def render_chat_panel(*, extra_context: str = "", page_name: str = "") -> None:
     paths = _user_paths()
     if paths is None:
@@ -1008,13 +1020,14 @@ def render_chat_panel(*, extra_context: str = "", page_name: str = "") -> None:
         st.chat_input("詢問 Agent...", disabled=True, key="studio_chat_connect_failed")
         return
 
-    chat = st.container(height=460, border=False)
+    chat = st.container(height=460, border=True)
     with chat:
         for entry in st.session_state["studio_chat_history"]:
             role, text, reasoning = _parse_history_entry(entry)
             _render_history_message(role, text, reasoning=reasoning)
 
     st.caption("輸入文字後 Enter 送出；可 Ctrl+V 貼圖，或點輸入框內圖片按鈕選檔（PNG/JPG/WEBP，上限 5 MB）。")
+    inject_multimodal_chatinput_theme_fix()
     chatinput = multimodal_chatinput(
         key=f"studio_multimodal_{current_session}",
     )

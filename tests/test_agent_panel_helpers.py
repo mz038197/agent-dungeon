@@ -100,3 +100,13 @@ def test_merged_reasoning_text_joins_rounds(
     assert "round one" in merged
     assert "round two" in merged
     assert module.REASONING_ROUND_SEPARATOR in merged
+
+
+def test_append_assistant_message(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    module, fake_streamlit, _ = _load_agent_panel_module(monkeypatch, tmp_path)
+    fake_streamlit.session_state = {}
+    module.append_assistant_message("Hello from forge")
+    history = fake_streamlit.session_state["studio_chat_history"]
+    assert history == [("assistant", "Hello from forge", "")]
