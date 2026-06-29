@@ -1,0 +1,12 @@
+.git
+.github
+.venv
+__pycache__
+.pytest_cache
+.local-data
+*.md
+!README.md
+.env
+.env.*
+config/local.env.example
+config/fly.secrets.env.example

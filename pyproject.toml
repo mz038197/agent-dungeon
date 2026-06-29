@@ -1,0 +1,24 @@
+[project]
+name = "agent-dungeon"
+version = "0.1.0"
+description = "Agent Dungeon — classroom Streamlit app with Google OAuth and Fly.io deployment."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "google-auth>=2.0",
+    "httpx>=0.28",
+    "openai-tts @ git+https://github.com/mz038197/openai-tts.git",
+    "peas-agent-core @ git+https://github.com/mz038197/peas-agent-core.git",
+    "st-multimodal-chatinput",
+    "streamlit>=1.40",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
