@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-import hashlib
 import os
+
+import hashlib
 import re
 from dataclasses import dataclass
 
 from auth.google_oauth import GoogleOAuthService, GoogleUserClaims
+from env_loader import load_local_env
 
 
 AUTH_SESSION_KEY = "auth_user"
@@ -40,7 +42,20 @@ def build_oauth_service() -> GoogleOAuthService:
 
 
 def oauth_enabled() -> bool:
+    if local_dev_auth_bypass():
+        return False
     return build_oauth_service().is_configured()
+
+
+def local_dev_auth_bypass() -> bool:
+    load_local_env()
+    return os.environ.get("LOCAL_DEV_AUTH", "").strip().lower() == "bypass"
+
+
+def default_dev_user() -> GoogleUserClaims:
+    email = os.environ.get("LOCAL_DEV_EMAIL", "dev@local.test").strip()
+    name = os.environ.get("LOCAL_DEV_NAME", "本地開發者").strip()
+    return dev_login(email, name)
 
 
 def get_auth_user(session_state) -> AuthUser | None:

@@ -5,16 +5,21 @@ from urllib.parse import unquote
 
 import streamlit as st
 
+from auth.google_oauth import GoogleUserClaims
 from auth.session import (
     OAUTH_STATE_KEY,
     build_oauth_service,
+    default_dev_user,
     get_auth_user,
+    local_dev_auth_bypass,
     oauth_enabled,
     oauth_redirect_uri,
 )
 from bootstrap_config import bootstrap_shared_config
 from cloud_paths import ensure_user_dirs, paths_for_user, write_profile
+from env_loader import load_local_env
 from auth.session import set_auth_user
+from shell_ui import inject_hide_streamlit_chrome
 
 
 def _oauth_state(oauth) -> str:
@@ -37,11 +42,9 @@ def _render_oauth_login_link(label: str, url: str) -> None:
 
 
 def _hide_streamlit_chrome() -> None:
-    st.markdown(
-        """
-<style>
-  [data-testid="stSidebar"], [data-testid="stHeader"], [data-testid="stToolbar"],
-  [data-testid="stDecoration"], footer { display: none !important; }
+    inject_hide_streamlit_chrome(
+        hide_sidebar=True,
+        extra_css="""
   .block-container { padding-top: 1rem !important; max-width: 520px !important; margin: 0 auto; }
   .login-title { font-size: 2rem; font-weight: 800; text-align: center; margin-bottom: 0.25rem; }
   .login-sub { text-align: center; color: #94a3b8; margin-bottom: 1.5rem; }
@@ -51,9 +54,7 @@ def _hide_streamlit_chrome() -> None:
     text-decoration: none !important; border-radius: 0.5rem; font-weight: 600;
   }
   .oauth-login-btn:hover { background: #ff6b6b; color: #fff !important; }
-</style>
 """,
-        unsafe_allow_html=True,
     )
 
 
@@ -112,8 +113,22 @@ def _handle_oauth_callback() -> str | None:
     return None
 
 
+def _apply_dev_login(claims: GoogleUserClaims) -> None:
+    bootstrap_shared_config()
+    user = set_auth_user(st.session_state, claims)
+    paths = paths_for_user(user.google_sub)
+    ensure_user_dirs(paths)
+    write_profile(paths, email=user.email, name=user.name)
+
+
 def render_login_gate() -> bool:
+    load_local_env()
+
     if get_auth_user(st.session_state) is not None:
+        return True
+
+    if local_dev_auth_bypass():
+        _apply_dev_login(default_dev_user())
         return True
 
     _hide_streamlit_chrome()
@@ -146,11 +161,7 @@ def render_login_gate() -> bool:
             except ValueError as exc:
                 st.session_state["login_error"] = str(exc)
                 st.rerun()
-            bootstrap_shared_config()
-            user = set_auth_user(st.session_state, claims)
-            paths = paths_for_user(user.google_sub)
-            ensure_user_dirs(paths)
-            write_profile(paths, email=user.email, name=user.name)
+            _apply_dev_login(claims)
             st.rerun()
     return False
 
