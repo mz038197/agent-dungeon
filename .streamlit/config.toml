@@ -3,7 +3,21 @@ headless = true
 enableCORS = false
 enableXsrfProtection = true
 
+[client]
+toolbarMode = "viewer"
+showSidebarNavigation = false
+
+[ui]
+hideTopBar = true
+
 [browser]
 gatherUsageStats = false
 serverAddress = "127.0.0.1"
 serverPort = 8501
+
+[theme]
+base = "light"
+backgroundColor = "#fff7ed"
+secondaryBackgroundColor = "#ffffff"
+textColor = "#0f172a"
+primaryColor = "#6366f1"
