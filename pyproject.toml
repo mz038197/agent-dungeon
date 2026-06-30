@@ -19,6 +19,19 @@ dev = [
     "pytest>=8.0",
 ]
 
+[project.scripts]
+agent-dungeon = "agent_dungeon.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/agent_dungeon"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["."]
+pythonpath = ["src"]

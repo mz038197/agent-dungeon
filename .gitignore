@@ -4,3 +4,7 @@ __pycache__/
 *.pyc
 .local-data/
 .streamlit/secrets.toml
+scratch/
+.playwright-cli/
+.env
+.env.*
