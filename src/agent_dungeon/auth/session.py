@@ -81,9 +81,13 @@ def set_auth_user(session_state, claims: GoogleUserClaims) -> AuthUser:
 
 
 def clear_auth(session_state) -> None:
+    from agent_dungeon.auth.cookie_manager import delete_auth_cookie
+
     session_state.pop(AUTH_SESSION_KEY, None)
     session_state.pop(OAUTH_STATE_KEY, None)
     session_state.pop("agent_panel_ctx", None)
+    session_state.pop("_auth_cookie_restore_attempted", None)
+    delete_auth_cookie()
 
 
 def dev_login(email: str, name: str) -> GoogleUserClaims:

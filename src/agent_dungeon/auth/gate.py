@@ -6,7 +6,9 @@ from urllib.parse import unquote
 import streamlit as st
 
 from agent_dungeon.auth.google_oauth import GoogleUserClaims
+from agent_dungeon.auth.cookie_manager import persist_auth_cookie, restore_auth_user_from_cookie
 from agent_dungeon.auth.session import (
+    AuthUser,
     OAUTH_STATE_KEY,
     build_oauth_service,
     default_dev_user,
@@ -110,7 +112,7 @@ def _handle_oauth_callback() -> str | None:
     write_profile(paths, email=user.email, name=user.name)
     st.session_state.pop(OAUTH_STATE_KEY, None)
     st.query_params.clear()
-    st.rerun()
+    _complete_login(user)
     return None
 
 
@@ -123,6 +125,49 @@ def _apply_dev_login(claims: GoogleUserClaims) -> None:
     write_profile(paths, email=user.email, name=user.name)
 
 
+def _apply_authenticated_user(user: AuthUser, *, write_profile_file: bool) -> AuthUser:
+    bootstrap_shared_config()
+    claims = GoogleUserClaims(
+        email=user.email,
+        name=user.name,
+        google_sub=user.google_sub,
+    )
+    set_auth_user(st.session_state, claims)
+    paths = paths_for_user(user.google_sub)
+    ensure_user_dirs(paths)
+    if write_profile_file:
+        ensure_user_agent_config(user.google_sub)
+        write_profile(paths, email=user.email, name=user.name)
+    return user
+
+
+def _complete_login(user: AuthUser) -> None:
+    persist_auth_cookie(user)
+    st.session_state.pop("_auth_cookie_restore_attempted", None)
+    st.rerun()
+
+
+def _try_restore_auth_from_cookie() -> bool:
+    if get_auth_user(st.session_state) is not None:
+        return True
+    if local_dev_auth_bypass():
+        return False
+
+    user, ready = restore_auth_user_from_cookie()
+    if not ready:
+        if not st.session_state.get("_auth_cookie_restore_attempted"):
+            st.session_state["_auth_cookie_restore_attempted"] = True
+            st.rerun()
+        return False
+
+    st.session_state.pop("_auth_cookie_restore_attempted", None)
+    if user is None:
+        return False
+
+    _apply_authenticated_user(user, write_profile_file=False)
+    return True
+
+
 def render_login_gate() -> bool:
     load_local_env()
 
@@ -131,6 +176,9 @@ def render_login_gate() -> bool:
 
     if local_dev_auth_bypass():
         _apply_dev_login(default_dev_user())
+        return True
+
+    if _try_restore_auth_from_cookie():
         return True
 
     _hide_streamlit_chrome()
@@ -163,9 +211,19 @@ def render_login_gate() -> bool:
             except ValueError as exc:
                 st.session_state["login_error"] = str(exc)
                 st.rerun()
-            _apply_dev_login(claims)
-            st.rerun()
+            user = _apply_dev_login_return_user(claims)
+            _complete_login(user)
     return False
+
+
+def _apply_dev_login_return_user(claims: GoogleUserClaims) -> AuthUser:
+    bootstrap_shared_config()
+    user = set_auth_user(st.session_state, claims)
+    paths = paths_for_user(user.google_sub)
+    ensure_user_dirs(paths)
+    ensure_user_agent_config(user.google_sub)
+    write_profile(paths, email=user.email, name=user.name)
+    return user
 
 
 def render_logout_button() -> None:
