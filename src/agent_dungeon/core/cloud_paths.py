@@ -45,6 +45,9 @@ class UserPaths:
     sessions: Path
     page_data: Path
     chat_images: Path
+    tts: Path
+    preferences: Path
+    effective_config: Path
 
 
 def paths_for_user(google_sub: str) -> UserPaths:
@@ -59,6 +62,9 @@ def paths_for_user(google_sub: str) -> UserPaths:
         sessions=workspace / "sessions",
         page_data=root / "page_data",
         chat_images=workspace / "uploads" / "chat_images",
+        tts=root / "tts.json",
+        preferences=root / "preferences.json",
+        effective_config=root / "effective_config.json",
     )
 
 

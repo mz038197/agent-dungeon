@@ -83,6 +83,7 @@ def set_auth_user(session_state, claims: GoogleUserClaims) -> AuthUser:
 def clear_auth(session_state) -> None:
     session_state.pop(AUTH_SESSION_KEY, None)
     session_state.pop(OAUTH_STATE_KEY, None)
+    session_state.pop("agent_panel_ctx", None)
 
 
 def dev_login(email: str, name: str) -> GoogleUserClaims:

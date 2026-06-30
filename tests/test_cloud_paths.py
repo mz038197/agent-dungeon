@@ -17,4 +17,7 @@ def test_different_subs_get_different_dirs(peas_home) -> None:
     b = paths_for_user("sub-b")
     assert a.root != b.root
     assert a.sessions != b.sessions
+    assert a.tts != b.tts
+    assert a.preferences != b.preferences
+    assert a.effective_config != b.effective_config
     assert user_root("sub-a") == peas_home / "users" / "sub-a"

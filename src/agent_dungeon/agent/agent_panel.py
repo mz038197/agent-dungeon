@@ -19,14 +19,14 @@ from agent_dungeon.auth.session import get_auth_user
 from agent_dungeon.core.bootstrap_config import (
     DEFAULT_TTS_BASE_URL,
     DEFAULT_TTS_MODEL,
-    apply_config_override,
     default_tts_config,
     ensure_tts_config_file,
     normalize_tts_config,
     read_tts_config,
     save_tts_config,
+    write_effective_config,
 )
-from agent_dungeon.core.cloud_paths import APP_ROOT, UserPaths, LEVEL_PAGES_DIR, paths_for_user, shared_config_path, shared_tts_config_path
+from agent_dungeon.core.cloud_paths import APP_ROOT, UserPaths, LEVEL_PAGES_DIR, paths_for_user
 from agent_dungeon.ui.shell_ui import inject_multimodal_chatinput_theme_fix
 
 REASONING_EFFORT_OPTIONS = ("none", "low", "medium", "high")
@@ -70,6 +70,7 @@ TTS_VOICE_LABELS: dict[str, str] = {
 }
 REASONING_ROUND_SEPARATOR = "\n\n---\n\n"
 TOOL_RUN_PLACEHOLDER = "（執行工具中…）"
+PANEL_CTX_KEY = "agent_panel_ctx"
 
 
 @dataclass(frozen=True)
@@ -77,12 +78,10 @@ class _PanelCtx:
     user_paths: UserPaths
     sessions_dir: Path
     chat_images_dir: Path
-    llm_config_path: Path
+    preferences_path: Path
+    effective_config_path: Path
     tts_config_path: Path
     activation_marker: Path
-
-
-_ctx: _PanelCtx | None = None
 
 
 def _user_paths() -> UserPaths | None:
@@ -93,22 +92,28 @@ def _user_paths() -> UserPaths | None:
 
 
 def _init_panel_ctx(paths: UserPaths) -> _PanelCtx:
-    global _ctx
-    _ctx = _PanelCtx(
+    ctx = _PanelCtx(
         user_paths=paths,
         sessions_dir=paths.sessions,
         chat_images_dir=paths.chat_images,
-        llm_config_path=shared_config_path(),
-        tts_config_path=shared_tts_config_path(),
+        preferences_path=paths.preferences,
+        effective_config_path=paths.effective_config,
+        tts_config_path=paths.tts,
         activation_marker=paths.root / ".agent_core_activated",
     )
-    return _ctx
+    st.session_state[PANEL_CTX_KEY] = ctx
+    return ctx
 
 
 def _require_ctx() -> _PanelCtx:
-    if _ctx is None:
+    user = get_auth_user(st.session_state)
+    if user is None:
         raise RuntimeError("Agent panel context 尚未初始化")
-    return _ctx
+    paths = paths_for_user(user.google_sub)
+    ctx = st.session_state.get(PANEL_CTX_KEY)
+    if not isinstance(ctx, _PanelCtx) or ctx.user_paths.google_sub != user.google_sub:
+        ctx = _init_panel_ctx(paths)
+    return ctx
 
 
 def _display_path(path: Path) -> str:
@@ -307,8 +312,19 @@ def _default_reasoning_config() -> dict[str, str]:
     return {"effort": "medium", "summary": "auto"}
 
 
-def _read_llm_config() -> dict[str, object]:
-    path = _require_ctx().llm_config_path
+def _read_preferences() -> dict[str, object]:
+    path = _require_ctx().preferences_path
+    if not path.is_file():
+        return {}
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return raw if isinstance(raw, dict) else {}
+
+
+def _read_effective_config() -> dict[str, object]:
+    path = _require_ctx().effective_config_path
     if not path.is_file():
         return {}
     try:
@@ -326,7 +342,7 @@ def _normalize_reasoning_effort(value: object) -> str:
 
 
 def _load_reasoning_effort() -> str:
-    cfg = _read_llm_config()
+    cfg = _read_preferences()
     llm = cfg.get("llm")
     if not isinstance(llm, dict):
         return _default_reasoning_config()["effort"]
@@ -337,7 +353,7 @@ def _load_reasoning_effort() -> str:
 
 
 def _load_use_responses_api() -> bool:
-    cfg = _read_llm_config()
+    cfg = _read_effective_config()
     llm = cfg.get("llm")
     if not isinstance(llm, dict):
         return True
@@ -347,7 +363,7 @@ def _load_use_responses_api() -> bool:
 def _save_reasoning_effort(effort: str) -> str | None:
     ctx = _require_ctx()
     normalized = _normalize_reasoning_effort(effort)
-    cfg = _read_llm_config()
+    cfg = _read_preferences()
     llm = cfg.get("llm")
     if not isinstance(llm, dict):
         llm = {}
@@ -358,8 +374,8 @@ def _save_reasoning_effort(effort: str) -> str | None:
         llm["reasoning"] = reasoning
     reasoning["effort"] = normalized
     try:
-        ctx.llm_config_path.parent.mkdir(parents=True, exist_ok=True)
-        ctx.llm_config_path.write_text(
+        ctx.preferences_path.parent.mkdir(parents=True, exist_ok=True)
+        ctx.preferences_path.write_text(
             json.dumps(cfg, ensure_ascii=False, indent=2) + "\n",
             encoding="utf-8",
         )
@@ -383,6 +399,9 @@ def _apply_reasoning_effort_change(new_effort: str) -> str | None:
     error = _save_reasoning_effort(new_effort)
     if error:
         return error
+    user = get_auth_user(st.session_state)
+    if user is not None:
+        write_effective_config(user.google_sub)
     agent = st.session_state.get("studio_agent")
     if agent is not None:
         return _reload_reasoning_llm_config(agent)
@@ -445,7 +464,7 @@ def _render_reasoning_settings_ui(*, settings_error: str | None = None) -> None:
             st.caption(
                 "關閉 (none) 可加速回覆；若 API 回 400 請改回 low 或確認模型是否支援 none。"
             )
-        st.caption(f"LLM 設定檔：`{ctx.llm_config_path}`")
+        st.caption(f"你的偏好設定：`{ctx.preferences_path}`")
         persist_error = _persist_reasoning_effort_if_changed()
         if persist_error:
             st.warning(persist_error)
@@ -811,7 +830,10 @@ def _create_agent_for_session(session_name: str) -> Any:
     ctx = _require_ctx()
     if not _is_valid_session_name(session_name):
         raise RuntimeError(f"對話紀錄無效：{session_name!r}")
-    apply_config_override()
+    user = get_auth_user(st.session_state)
+    if user is None:
+        raise RuntimeError("未登入")
+    write_effective_config(user.google_sub)
     try:
         from peas_agent import Agent
     except ImportError as exc:
@@ -823,6 +845,7 @@ def _create_agent_for_session(session_name: str) -> Any:
         session_name=session_name,
         project_root=APP_ROOT,
         host_context=_studio_context(),
+        config_path=ctx.effective_config_path,
     )
 
 
@@ -999,7 +1022,8 @@ def render_chat_panel(*, extra_context: str = "", page_name: str = "") -> None:
     with st.expander("技術資訊", expanded=False):
         st.caption(f"對話紀錄檔：{ctx.sessions_dir / current_session}")
         st.caption(f"語音設定檔：{ctx.tts_config_path}")
-        st.caption(f"LLM 設定檔：{ctx.llm_config_path}")
+        st.caption(f"偏好設定：{ctx.preferences_path}")
+        st.caption(f"Agent 執行設定：{ctx.effective_config_path}")
         if page_name:
             st.caption(f"目前頁面：{page_name}")
 

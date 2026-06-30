@@ -7,7 +7,12 @@ from typing import Any
 
 from openai_tts.settings import MAX_TTS_SPEED, MIN_TTS_SPEED, Settings
 
-from agent_dungeon.core.cloud_paths import peas_agent_home, shared_config_path, shared_tts_config_path
+from agent_dungeon.core.cloud_paths import (
+    paths_for_user,
+    peas_agent_home,
+    shared_config_path,
+    shared_tts_config_path,
+)
 
 DEFAULT_TTS_BASE_URL = "https://ai.vanscoding.com/v1"
 DEFAULT_TTS_MODEL = "openai@gpt-4o-mini-tts"
@@ -190,6 +195,75 @@ def ensure_tts_config_file(path: Path) -> str | None:
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def default_preferences() -> dict[str, Any]:
+    return {"llm": {"reasoning": {"effort": "medium", "summary": "auto"}}}
+
+
+def _read_json_dict(path: Path) -> dict[str, Any]:
+    if not path.is_file():
+        return {}
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return raw if isinstance(raw, dict) else {}
+
+
+def _load_shared_config_dict() -> dict[str, Any]:
+    raw = _read_json_dict(shared_config_path())
+    return _merge_env_into_config(_deep_merge_dict(_default_config(), raw))
+
+
+def build_effective_config(google_sub: str) -> dict[str, Any]:
+    base = _load_shared_config_dict()
+    paths = paths_for_user(google_sub)
+    prefs = _read_json_dict(paths.preferences) or default_preferences()
+    llm = dict(base.get("llm") or {})
+    pref_llm = prefs.get("llm")
+    if isinstance(pref_llm, dict):
+        pref_reasoning = pref_llm.get("reasoning")
+        if isinstance(pref_reasoning, dict):
+            reasoning = dict(llm.get("reasoning") or {})
+            reasoning.update(pref_reasoning)
+            llm["reasoning"] = reasoning
+    base["llm"] = llm
+    return base
+
+
+def write_effective_config(google_sub: str) -> None:
+    paths = paths_for_user(google_sub)
+    _write_json(paths.effective_config, build_effective_config(google_sub))
+
+
+def ensure_user_agent_config(google_sub: str) -> None:
+    paths = paths_for_user(google_sub)
+    paths.root.mkdir(parents=True, exist_ok=True)
+    paths.workspace.mkdir(parents=True, exist_ok=True)
+
+    if not paths.tts.is_file():
+        shared_tts, _ = read_tts_config(shared_tts_config_path())
+        save_tts_config(paths.tts, shared_tts)
+
+    if not paths.preferences.is_file():
+        prefs = default_preferences()
+        shared = _read_json_dict(shared_config_path())
+        shared_llm = shared.get("llm")
+        if isinstance(shared_llm, dict):
+            shared_reasoning = shared_llm.get("reasoning")
+            if isinstance(shared_reasoning, dict):
+                reasoning = dict(prefs["llm"]["reasoning"])
+                effort = shared_reasoning.get("effort")
+                summary = shared_reasoning.get("summary")
+                if effort is not None:
+                    reasoning["effort"] = str(effort)
+                if summary is not None:
+                    reasoning["summary"] = str(summary)
+                prefs["llm"]["reasoning"] = reasoning
+        _write_json(paths.preferences, prefs)
+
+    write_effective_config(google_sub)
 
 
 def bootstrap_shared_config() -> None:

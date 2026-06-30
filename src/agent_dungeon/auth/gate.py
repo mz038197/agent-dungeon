@@ -15,7 +15,7 @@ from agent_dungeon.auth.session import (
     oauth_enabled,
     oauth_redirect_uri,
 )
-from agent_dungeon.core.bootstrap_config import bootstrap_shared_config
+from agent_dungeon.core.bootstrap_config import bootstrap_shared_config, ensure_user_agent_config
 from agent_dungeon.core.cloud_paths import ensure_user_dirs, paths_for_user, write_profile
 from agent_dungeon.core.env_loader import load_local_env
 from agent_dungeon.auth.session import set_auth_user
@@ -106,6 +106,7 @@ def _handle_oauth_callback() -> str | None:
     user = set_auth_user(st.session_state, claims)
     paths = paths_for_user(user.google_sub)
     ensure_user_dirs(paths)
+    ensure_user_agent_config(user.google_sub)
     write_profile(paths, email=user.email, name=user.name)
     st.session_state.pop(OAUTH_STATE_KEY, None)
     st.query_params.clear()
@@ -118,6 +119,7 @@ def _apply_dev_login(claims: GoogleUserClaims) -> None:
     user = set_auth_user(st.session_state, claims)
     paths = paths_for_user(user.google_sub)
     ensure_user_dirs(paths)
+    ensure_user_agent_config(user.google_sub)
     write_profile(paths, email=user.email, name=user.name)
 
 
