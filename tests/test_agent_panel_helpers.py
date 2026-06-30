@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from cloud_paths import paths_for_user
+from agent_dungeon.core.cloud_paths import paths_for_user
 
 
 def _load_agent_panel_module(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
@@ -33,7 +33,7 @@ def _load_agent_panel_module(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     fake_multimodal.multimodal_chatinput = lambda **_kwargs: None
     monkeypatch.setitem(sys.modules, "st_multimodal_chatinput", fake_multimodal)
 
-    module_path = Path(__file__).parents[1] / "agent_panel.py"
+    module_path = Path(__file__).parents[1] / "src" / "agent_dungeon" / "agent" / "agent_panel.py"
     spec = util.spec_from_file_location("agent_panel_under_test", module_path)
     assert spec is not None
     assert spec.loader is not None

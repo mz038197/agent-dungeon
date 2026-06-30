@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from forge_challenges import (
+from agent_dungeon.forge.challenges import (
     LEGACY_ANSWER_CODES,
     VOICE_FORGE_CHALLENGES,
     challenge_codes_from_stored,

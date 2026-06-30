@@ -2,18 +2,18 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from shell_ui import discover_file_pages, navigation_page_path, page_url_from_relative_page
+from agent_dungeon.ui.shell_ui import discover_file_pages, navigation_page_path, page_url_from_relative_page
 
 
 def test_navigation_page_path_uses_posix_slashes() -> None:
-    assert navigation_page_path("pages\\0_Voice.py") == "pages/0_Voice.py"
+    assert navigation_page_path("level_pages\\0_Voice.py") == "level_pages/0_Voice.py"
 
 
 def test_page_url_from_relative_page_uses_streamlit_title_url() -> None:
-    assert page_url_from_relative_page("pages/0_Voice.py") == "/Voice"
+    assert page_url_from_relative_page("level_pages/0_Voice.py") == "/Voice"
 
 
 def test_discover_file_pages_includes_voice_with_relative_ref() -> None:
-    app_root = Path(__file__).resolve().parent.parent
-    voice = next(path for path in discover_file_pages(app_root / "pages") if path.name == "0_Voice.py")
-    assert navigation_page_path(voice.relative_to(app_root).as_posix()) == "pages/0_Voice.py"
+    app_root = Path(__file__).resolve().parent.parent / "src" / "agent_dungeon"
+    voice = next(path for path in discover_file_pages(app_root / "level_pages") if path.name == "0_Voice.py")
+    assert navigation_page_path(voice.relative_to(app_root).as_posix()) == "level_pages/0_Voice.py"

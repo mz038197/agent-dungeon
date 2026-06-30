@@ -5,9 +5,11 @@ from pathlib import Path
 
 import pytest
 
+_PKG_ROOT = Path(__file__).resolve().parent.parent / "src" / "agent_dungeon"
+
 
 def test_voice_page_includes_login_bootstrap() -> None:
-    voice_path = Path(__file__).resolve().parent.parent / "pages" / "0_Voice.py"
+    voice_path = _PKG_ROOT / "level_pages" / "0_Voice.py"
     source = voice_path.read_text(encoding="utf-8")
     assert "init_dungeon_environment()" in source
     assert "require_dungeon_login()" in source
@@ -16,8 +18,9 @@ def test_voice_page_includes_login_bootstrap() -> None:
 
 
 def test_page_bootstrap_module_loads() -> None:
-    root = Path(__file__).resolve().parent.parent
-    spec = importlib.util.spec_from_file_location("page_bootstrap", root / "page_bootstrap.py")
+    spec = importlib.util.spec_from_file_location(
+        "page_bootstrap", _PKG_ROOT / "core" / "page_bootstrap.py"
+    )
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)

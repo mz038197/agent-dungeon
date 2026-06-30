@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from dungeon_context import build_dungeon_extra_context
-from progress import (
+from agent_dungeon.core.dungeon_context import build_dungeon_extra_context
+from agent_dungeon.core.progress import (
     DungeonProgress,
     mark_forge_challenge_complete,
     skill_forge_complete,

@@ -4,7 +4,7 @@ import os
 
 import pytest
 
-from auth.session import (
+from agent_dungeon.auth.session import (
     default_dev_user,
     local_dev_auth_bypass,
     oauth_enabled,
@@ -25,7 +25,7 @@ def _clear_local_dev_env(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_local_dev_auth_bypass_flag(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("auth.session.load_local_env", lambda: None)
+    monkeypatch.setattr("agent_dungeon.auth.session.load_local_env", lambda: None)
     assert local_dev_auth_bypass() is False
     monkeypatch.setenv("LOCAL_DEV_AUTH", "bypass")
     assert local_dev_auth_bypass() is True
@@ -34,7 +34,7 @@ def test_local_dev_auth_bypass_flag(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_oauth_disabled_when_bypass(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("auth.session.load_local_env", lambda: None)
+    monkeypatch.setattr("agent_dungeon.auth.session.load_local_env", lambda: None)
     monkeypatch.setenv("LOCAL_DEV_AUTH", "bypass")
     monkeypatch.setenv("GOOGLE_CLIENT_ID", "id")
     monkeypatch.setenv("GOOGLE_CLIENT_SECRET", "secret")

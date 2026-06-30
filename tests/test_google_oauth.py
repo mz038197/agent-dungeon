@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from auth.google_oauth import GoogleOAuthService
+from agent_dungeon.auth.google_oauth import GoogleOAuthService
 
 
 def test_oauth_state_roundtrip() -> None:

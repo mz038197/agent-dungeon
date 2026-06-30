@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from progress import (
+from agent_dungeon.core.progress import (
     AGENT_NEXT_QUEST_HINTS,
     load_quests_config,
     quest_subtitle,

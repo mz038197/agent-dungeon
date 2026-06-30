@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from shell_ui import _MULTIMODAL_CHATINPUT_LIGHT_CSS, multimodal_chatinput_light_theme_js
+from agent_dungeon.ui.shell_ui import _MULTIMODAL_CHATINPUT_LIGHT_CSS, multimodal_chatinput_light_theme_js
 
 
 def test_multimodal_patch_includes_inner_observer_and_color_scheme() -> None:
@@ -15,7 +15,9 @@ def test_multimodal_patch_includes_inner_observer_and_color_scheme() -> None:
 
 
 def test_dungeon_shell_css_distinguishes_primary_and_secondary_buttons() -> None:
-    css = (Path(__file__).resolve().parent.parent / "dungeon_shell.py").read_text(
+    repo_root = Path(__file__).resolve().parent.parent
+    pkg_root = repo_root / "src" / "agent_dungeon"
+    css = (pkg_root / "ui" / "dungeon_shell.py").read_text(
         encoding="utf-8"
     )
     assert 'button[data-testid="stBaseButton-primary"]' in css
@@ -24,13 +26,33 @@ def test_dungeon_shell_css_distinguishes_primary_and_secondary_buttons() -> None
     assert '[data-testid="stButton"] button,' not in css.split("次要按鈕")[1].split("primary")[0]
     assert "stPageLink" in css
     assert "disableComponentPointerCapture" in (
-        Path(__file__).resolve().parent.parent / "shell_ui.py"
+        pkg_root / "ui" / "shell_ui.py"
     ).read_text(encoding="utf-8")
 
 
 def test_streamlit_config_forces_light_theme() -> None:
+    repo_root = Path(__file__).resolve().parent.parent
+    pkg_root = repo_root / "src" / "agent_dungeon"
     config = (
-        Path(__file__).resolve().parent.parent / ".streamlit" / "config.toml"
+        pkg_root / ".streamlit" / "config.toml"
     ).read_text(encoding="utf-8")
     assert 'base = "light"' in config
     assert 'primaryColor = "#6366f1"' in config
+
+
+def test_shell_flush_css_covers_top_and_bottom() -> None:
+    repo_root = Path(__file__).resolve().parent.parent
+    shell_ui = (repo_root / "src" / "agent_dungeon" / "ui" / "shell_ui.py").read_text(
+        encoding="utf-8"
+    )
+    dungeon_shell = (
+        repo_root / "src" / "agent_dungeon" / "ui" / "dungeon_shell.py"
+    ).read_text(encoding="utf-8")
+    assert "padding-bottom: 0 !important" in shell_ui
+    assert "#dungeon-css-anchor" in shell_ui
+    assert "#dungeon-paint-anchor" in shell_ui
+    assert "dungeon-shell-flush-bottom" in shell_ui
+    assert "flushShellToBottom" in dungeon_shell
+    assert "margin-top: 0 !important" in dungeon_shell.split("Footer 深藍底")[1]
+    assert "border-radius: 0 !important" in dungeon_shell.split("Footer 深藍底")[1]
+    assert "stVerticalBlock" in dungeon_shell

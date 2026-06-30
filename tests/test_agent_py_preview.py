@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from agent_py_preview import build_agent_py_preview
-from progress import (
+from agent_dungeon.agent.agent_py_preview import build_agent_py_preview
+from agent_dungeon.core.progress import (
     DungeonProgress,
     mark_forge_challenge_complete,
     mark_forge_lab_complete,

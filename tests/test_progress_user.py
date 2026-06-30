@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from progress import (
+from agent_dungeon.core.progress import (
     ModuleStatus,
     agent_level,
     agent_level_view,

@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from bootstrap_config import (
+from agent_dungeon.core.bootstrap_config import (
     DEFAULT_TTS_BASE_URL,
     DEFAULT_TTS_MODEL,
     bootstrap_shared_config,

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from cloud_paths import paths_for_user, user_root
+from agent_dungeon.core.cloud_paths import paths_for_user, user_root
 
 
 @pytest.fixture

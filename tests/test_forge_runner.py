@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from forge_runner import run_forge_challenge, run_forge_lab_code
+from agent_dungeon.forge.runner import run_forge_challenge, run_forge_lab_code
 
 
 def test_challenge_c1_passes() -> None:
