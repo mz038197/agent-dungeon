@@ -5,8 +5,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from openai_tts import Settings
-from openai_tts.settings import MAX_TTS_SPEED, MIN_TTS_SPEED
+from openai_tts.settings import MAX_TTS_SPEED, MIN_TTS_SPEED, Settings
 
 from agent_dungeon.core.cloud_paths import peas_agent_home, shared_config_path, shared_tts_config_path
 
