@@ -12,9 +12,16 @@ from agent_dungeon.auth.cookie_session import (
 from agent_dungeon.auth.session import AuthUser, local_dev_auth_bypass
 
 
-@st.cache_resource
+_COOKIE_MANAGER_STATE_KEY = "dungeon_auth_cookie_manager"
+
+
 def _cookie_manager() -> stx.CookieManager:
-    return stx.CookieManager(key="dungeon_auth_cookie_manager")
+    """Per-session CookieManager singleton (widgets must not live in @st.cache_*)."""
+    if _COOKIE_MANAGER_STATE_KEY not in st.session_state:
+        st.session_state[_COOKIE_MANAGER_STATE_KEY] = stx.CookieManager(
+            key="dungeon_auth_cookie_manager"
+        )
+    return st.session_state[_COOKIE_MANAGER_STATE_KEY]
 
 
 def auth_cookie_enabled() -> bool:
