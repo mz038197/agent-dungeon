@@ -15,8 +15,8 @@ from openai_tts import Settings, stream_tts_play
 from openai_tts.settings import MAX_TTS_SPEED, MIN_TTS_SPEED
 from st_multimodal_chatinput import multimodal_chatinput
 
-from shell_ui import inject_multimodal_chatinput_theme_fix
-from bootstrap_config import (
+from agent_dungeon.auth.session import get_auth_user
+from agent_dungeon.core.bootstrap_config import (
     DEFAULT_TTS_BASE_URL,
     DEFAULT_TTS_MODEL,
     apply_config_override,
@@ -26,7 +26,8 @@ from bootstrap_config import (
     read_tts_config,
     save_tts_config,
 )
-from cloud_paths import APP_ROOT, UserPaths, paths_for_user, shared_config_path, shared_tts_config_path
+from agent_dungeon.core.cloud_paths import APP_ROOT, UserPaths, LEVEL_PAGES_DIR, paths_for_user, shared_config_path, shared_tts_config_path
+from agent_dungeon.ui.shell_ui import inject_multimodal_chatinput_theme_fix
 
 REASONING_EFFORT_OPTIONS = ("none", "low", "medium", "high")
 REASONING_EFFORT_LABELS = {
@@ -115,7 +116,7 @@ def _display_path(path: Path) -> str:
 
 
 def _studio_context() -> str:
-    pages_dir = _display_path(APP_ROOT / "pages")
+    pages_dir = _display_path(LEVEL_PAGES_DIR)
     data_dir = _display_path(APP_ROOT / "data")
     return "\n".join(
         [

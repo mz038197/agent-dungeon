@@ -5,8 +5,8 @@ from urllib.parse import unquote
 
 import streamlit as st
 
-from auth.google_oauth import GoogleUserClaims
-from auth.session import (
+from agent_dungeon.auth.google_oauth import GoogleUserClaims
+from agent_dungeon.auth.session import (
     OAUTH_STATE_KEY,
     build_oauth_service,
     default_dev_user,
@@ -15,11 +15,11 @@ from auth.session import (
     oauth_enabled,
     oauth_redirect_uri,
 )
-from bootstrap_config import bootstrap_shared_config
-from cloud_paths import ensure_user_dirs, paths_for_user, write_profile
-from env_loader import load_local_env
-from auth.session import set_auth_user
-from shell_ui import inject_hide_streamlit_chrome
+from agent_dungeon.core.bootstrap_config import bootstrap_shared_config
+from agent_dungeon.core.cloud_paths import ensure_user_dirs, paths_for_user, write_profile
+from agent_dungeon.core.env_loader import load_local_env
+from agent_dungeon.auth.session import set_auth_user
+from agent_dungeon.ui.shell_ui import inject_hide_streamlit_chrome
 
 
 def _oauth_state(oauth) -> str:
@@ -154,7 +154,7 @@ def render_login_gate() -> bool:
         email = st.text_input("Gmail")
         name = st.text_input("姓名")
         if st.form_submit_button("開發模式登入", use_container_width=True):
-            from auth.session import dev_login
+            from agent_dungeon.auth.session import dev_login
 
             try:
                 claims = dev_login(email, name)
@@ -174,7 +174,7 @@ def render_logout_button() -> None:
         st.caption(user.name)
         st.caption(user.email)
         if st.button("登出", use_container_width=True):
-            from auth.session import clear_auth
+            from agent_dungeon.auth.session import clear_auth
 
             clear_auth(st.session_state)
             st.rerun()

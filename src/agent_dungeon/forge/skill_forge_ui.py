@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import streamlit as st
 
-from forge_challenges import VOICE_FORGE_CHALLENGES, ForgeChallenge
-from forge_runner import run_forge_challenge
-from progress import (
+from agent_dungeon.forge.challenges import VOICE_FORGE_CHALLENGES, ForgeChallenge
+from agent_dungeon.forge.runner import run_forge_challenge
+from agent_dungeon.core.progress import (
     DungeonProgress,
     challenge_complete,
     mark_forge_challenge_complete,

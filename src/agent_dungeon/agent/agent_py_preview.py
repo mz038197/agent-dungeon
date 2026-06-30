@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from forge_challenges import VOICE_FORGE_CHALLENGES
-from progress import DungeonProgress, challenge_complete, voice_module_online
+from agent_dungeon.forge.challenges import VOICE_FORGE_CHALLENGES
+from agent_dungeon.core.progress import DungeonProgress, challenge_complete, voice_module_online
 
 _PREVIEW_HEADER = "# agent.py — 建造中"
 _VOICE_SECTION = "# === Voice 模組 ==="

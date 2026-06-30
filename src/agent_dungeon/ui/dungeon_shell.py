@@ -5,12 +5,12 @@ from collections.abc import Callable
 import streamlit as st
 import streamlit.components.v1 as components
 
-from agent_column import render_agent_column
-from auth.session import get_auth_user
-from cloud_paths import paths_for_user
-from progress import DungeonProgress, load_user_progress
-from sidebar_nav import ModuleId, render_footer_bar, render_left_sidebar
-from shell_ui import (
+from agent_dungeon.agent.agent_column import render_agent_column
+from agent_dungeon.auth.session import get_auth_user
+from agent_dungeon.core.cloud_paths import paths_for_user
+from agent_dungeon.core.progress import DungeonProgress, load_user_progress
+from agent_dungeon.ui.sidebar_nav import ModuleId, render_footer_bar, render_left_sidebar
+from agent_dungeon.ui.shell_ui import (
     inject_css_block,
     multimodal_chatinput_light_theme_js,
     shell_base_css,
@@ -28,13 +28,18 @@ _DUNGEON_INNER_CSS = """
   .block-container,
   [data-testid="stMainBlockContainer"] {
     padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    margin-bottom: 0 !important;
     padding-left: 0 !important;
     padding-right: 0 !important;
     max-width: 100% !important;
   }
-  #dungeon-shell-anchor, #dungeon-footer-anchor { display: none; }
+  #dungeon-shell-anchor, #dungeon-footer-anchor,
+  #dungeon-css-anchor, #dungeon-paint-anchor { display: none; }
   [data-testid="stElementContainer"]:has(#dungeon-shell-anchor),
-  [data-testid="stElementContainer"]:has(#dungeon-footer-anchor) {
+  [data-testid="stElementContainer"]:has(#dungeon-footer-anchor),
+  [data-testid="stElementContainer"]:has(#dungeon-css-anchor),
+  [data-testid="stElementContainer"]:has(#dungeon-paint-anchor) {
     display: none !important;
     height: 0 !important;
     min-height: 0 !important;
@@ -84,6 +89,7 @@ _DUNGEON_INNER_CSS = """
     max-width: none !important;
     width: 100% !important;
     margin-top: 0 !important;
+    margin-bottom: 0 !important;
   }
   [data-testid="stElementContainer"]:has(#dungeon-shell-anchor)
     + [data-testid="stLayoutWrapper"]
@@ -122,13 +128,20 @@ _DUNGEON_INNER_CSS = """
     padding: 0.65rem 0.85rem !important;
   }
 
+  /* Main 垂直區塊：消除 shell 與 footer 之間 Streamlit 預設 16px gap */
+  [data-testid="stMainBlockContainer"] > [data-testid="stVerticalBlock"] {
+    gap: 0 !important;
+    row-gap: 0 !important;
+  }
+
   /* Footer 深藍底 */
   [data-testid="stElementContainer"]:has(#dungeon-footer-anchor)
     + [data-testid="stLayoutWrapper"] {
     background-color: #0b1120 !important;
-    border-radius: 12px;
+    border-radius: 0 !important;
     padding: 0.55rem 1rem !important;
-    margin-top: 0.35rem;
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
   }
   [data-testid="stElementContainer"]:has(#dungeon-footer-anchor)
     + [data-testid="stLayoutWrapper"] [data-testid="stCaptionContainer"] {
@@ -754,6 +767,35 @@ _LIGHT_COLUMN_PAINT = """
     return;
   }
 
+  const iframe = window.frameElement;
+  const paintContainer = iframe?.closest('[data-testid="stElementContainer"]');
+  if (paintContainer && !paintContainer.querySelector("#dungeon-paint-anchor")) {
+    const marker = host.document.createElement("span");
+    marker.id = "dungeon-paint-anchor";
+    marker.hidden = true;
+    paintContainer.appendChild(marker);
+  }
+
+  function collapseElementContainer(node) {
+    node.style.display = "none";
+    node.style.height = "0px";
+    node.style.minHeight = "0px";
+    node.style.maxHeight = "0px";
+    node.style.margin = "0px";
+    node.style.padding = "0px";
+    node.style.overflow = "hidden";
+    node.style.border = "none";
+  }
+
+  function isMarkerContainer(node) {
+    return (
+      node.querySelector("#dungeon-shell-anchor")
+      || node.querySelector("#dungeon-footer-anchor")
+      || node.querySelector("#dungeon-css-anchor")
+      || node.querySelector("#dungeon-paint-anchor")
+    );
+  }
+
   function shellColumns(doc) {
     const anchor = doc.getElementById("dungeon-shell-anchor");
     if (!anchor) {
@@ -800,6 +842,19 @@ _LIGHT_COLUMN_PAINT = """
     return layout.querySelector('[data-testid="stHorizontalBlock"]');
   }
 
+  function footerLayoutWrapper(doc) {
+    const anchor = doc.getElementById("dungeon-footer-anchor");
+    if (!anchor) {
+      return null;
+    }
+    const layout = anchor.closest('[data-testid="stElementContainer"]')
+      ?.nextElementSibling;
+    if (!layout || layout.getAttribute("data-testid") !== "stLayoutWrapper") {
+      return null;
+    }
+    return layout;
+  }
+
   function flushShellToTop(doc) {
     const headerSelectors = [
       "header.stAppHeader",
@@ -811,6 +866,8 @@ _LIGHT_COLUMN_PAINT = """
     headerSelectors.forEach((selector) => {
       doc.querySelectorAll(selector).forEach((node) => {
         node.style.display = "none";
+        node.style.position = "absolute";
+        node.style.width = "0px";
         node.style.height = "0px";
         node.style.minHeight = "0px";
         node.style.maxHeight = "0px";
@@ -823,6 +880,8 @@ _LIGHT_COLUMN_PAINT = """
     const padSelectors = [
       '[data-testid="stAppViewBlockContainer"]',
       '[data-testid="stMainBlockContainer"]',
+      '[data-testid="stAppViewContainer"] > section',
+      '[data-testid="stVerticalBlockBorderWrapper"]',
       "section.stMain",
       "section.main",
       ".stApp",
@@ -836,16 +895,8 @@ _LIGHT_COLUMN_PAINT = """
     });
 
     doc.querySelectorAll('[data-testid="stElementContainer"]').forEach((node) => {
-      if (
-        node.querySelector("#dungeon-shell-anchor")
-        || node.querySelector("#dungeon-footer-anchor")
-      ) {
-        node.style.display = "none";
-        node.style.height = "0px";
-        node.style.minHeight = "0px";
-        node.style.margin = "0px";
-        node.style.padding = "0px";
-        node.style.overflow = "hidden";
+      if (isMarkerContainer(node)) {
+        collapseElementContainer(node);
       }
     });
 
@@ -853,50 +904,148 @@ _LIGHT_COLUMN_PAINT = """
     const main = doc.querySelector('[data-testid="stMainBlockContainer"]');
     const viewBlock = doc.querySelector('[data-testid="stAppViewBlockContainer"]');
     if (!shellRow || !main) {
-      return;
+      return false;
     }
 
-    const applyOffset = () => {
-      const top = Math.round(shellRow.getBoundingClientRect().top);
-      if (top > 0) {
-        main.classList.add("dungeon-shell-flush");
-        main.style.setProperty("--dungeon-shell-offset", `${top}px`);
-        main.style.marginTop = `-${top}px`;
-        if (viewBlock) {
-          viewBlock.style.paddingTop = "0px";
-        }
-      } else {
-        main.classList.remove("dungeon-shell-flush");
-        main.style.removeProperty("--dungeon-shell-offset");
-        main.style.marginTop = "0px";
+    const top = Math.round(shellRow.getBoundingClientRect().top);
+    if (top > 0) {
+      main.classList.add("dungeon-shell-flush");
+      main.style.setProperty("--dungeon-shell-offset", `${top}px`);
+      main.style.marginTop = `-${top}px`;
+      if (viewBlock) {
+        viewBlock.style.paddingTop = "0px";
+        viewBlock.style.marginTop = `-${top}px`;
       }
-    };
+      return false;
+    }
 
-    applyOffset();
-    host.requestAnimationFrame(applyOffset);
+    main.classList.remove("dungeon-shell-flush");
+    main.style.removeProperty("--dungeon-shell-offset");
+    main.style.marginTop = "0px";
+    if (viewBlock) {
+      viewBlock.style.marginTop = "0px";
+    }
+    return true;
+  }
+
+  function flushShellToBottom(doc) {
+    const padSelectors = [
+      '[data-testid="stAppViewBlockContainer"]',
+      '[data-testid="stMainBlockContainer"]',
+      "section.stMain",
+      "section.main",
+      ".stApp",
+      ".block-container",
+    ];
+    padSelectors.forEach((selector) => {
+      doc.querySelectorAll(selector).forEach((node) => {
+        node.style.paddingBottom = "0px";
+        node.style.marginBottom = "0px";
+      });
+    });
+
+    doc.querySelectorAll(
+      '[data-testid="stMainBlockContainer"] > [data-testid="stVerticalBlock"]'
+    ).forEach((node) => {
+      node.style.gap = "0px";
+      node.style.rowGap = "0px";
+    });
+
+    const footerLayout = footerLayoutWrapper(doc);
+    if (footerLayout) {
+      footerLayout.style.borderRadius = "0px";
+      footerLayout.style.marginTop = "0px";
+    }
+
+    doc.querySelectorAll('[data-testid="stElementContainer"]').forEach((node) => {
+      if (isMarkerContainer(node)) {
+        collapseElementContainer(node);
+      }
+    });
+
+    const footerContainer = doc.getElementById("dungeon-footer-anchor")
+      ?.closest('[data-testid="stElementContainer"]');
+    let sibling = footerLayout?.nextElementSibling;
+    while (sibling) {
+      if (sibling.matches('[data-testid="stElementContainer"]')) {
+        collapseElementContainer(sibling);
+      }
+      sibling = sibling.nextElementSibling;
+    }
+
+    const main = doc.querySelector('[data-testid="stMainBlockContainer"]');
+    const viewBlock = doc.querySelector('[data-testid="stAppViewBlockContainer"]');
+    if (!main || !footerLayout) {
+      return false;
+    }
+
+    const footerBottom = Math.round(footerLayout.getBoundingClientRect().bottom);
+    const mainBottom = Math.round(main.getBoundingClientRect().bottom);
+    const excess = mainBottom - footerBottom;
+    if (excess > 0) {
+      main.classList.add("dungeon-shell-flush-bottom");
+      main.style.setProperty("--dungeon-shell-bottom-offset", `${excess}px`);
+      main.style.paddingBottom = "0px";
+      if (viewBlock) {
+        viewBlock.classList.add("dungeon-shell-flush-bottom");
+        viewBlock.style.setProperty("--dungeon-shell-bottom-offset", `${excess}px`);
+        viewBlock.style.paddingBottom = "0px";
+      }
+      if (footerContainer) {
+        footerContainer.style.marginBottom = "0px";
+        footerContainer.style.paddingBottom = "0px";
+      }
+      return false;
+    }
+
+    main.classList.remove("dungeon-shell-flush-bottom");
+    main.style.removeProperty("--dungeon-shell-bottom-offset");
+    if (viewBlock) {
+      viewBlock.classList.remove("dungeon-shell-flush-bottom");
+      viewBlock.style.removeProperty("--dungeon-shell-bottom-offset");
+    }
+    return true;
   }
 
   __MULTIMODAL_PATCH_JS__
 
-  let shellPainted = false;
+  let columnsPainted = false;
 
   function paintAll() {
-    if (!shellPainted) {
-      flushShellToTop(host.document);
+    const topOk = flushShellToTop(host.document);
+    const bottomOk = flushShellToBottom(host.document);
+    if (!columnsPainted) {
       paintShellColumns();
-      shellPainted = !!shellColumns(host.document);
+      columnsPainted = !!shellColumns(host.document);
     }
     patchMultimodalChatinputIframes(host.document);
+    return topOk && bottomOk && columnsPainted;
   }
 
   function tryPaint(attempt) {
-    paintAll();
-    if (!shellPainted && attempt > 0) {
+    const done = paintAll();
+    if (!done && attempt > 0) {
       host.requestAnimationFrame(() => tryPaint(attempt - 1));
     }
   }
 
   tryPaint(20);
+
+  const mainBlock = host.document.querySelector('[data-testid="stMainBlockContainer"]');
+  if (mainBlock && !host.__dungeonShellLayoutObserver) {
+    host.__dungeonShellLayoutObserver = true;
+    let pending = 0;
+    new MutationObserver(() => {
+      if (pending) {
+        return;
+      }
+      pending = host.requestAnimationFrame(() => {
+        pending = 0;
+        flushShellToTop(host.document);
+        flushShellToBottom(host.document);
+      });
+    }).observe(mainBlock, { childList: true, subtree: true, attributes: true });
+  }
 })();
 </script>
 """

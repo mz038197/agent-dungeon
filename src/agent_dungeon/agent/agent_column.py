@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import streamlit as st
 
-from agent_panel import render_chat_panel
-from agent_py_preview import build_agent_py_preview
-from progress import DungeonProgress
+from agent_dungeon.agent.agent_panel import render_chat_panel
+from agent_dungeon.agent.agent_py_preview import build_agent_py_preview
+from agent_dungeon.core.progress import DungeonProgress
 
 
 def _render_agent_py_preview(

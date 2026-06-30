@@ -4,7 +4,7 @@ import html
 
 import streamlit as st
 
-from shell_ui import navigation_page_path
+from agent_dungeon.ui.shell_ui import dungeon_file_page
 
 
 def render_mission_complete_banner(
@@ -45,4 +45,4 @@ def render_mission_complete_banner(
         )
         if st.button("→", disabled=not can_navigate, key=button_key, use_container_width=True):
             if next_page:
-                st.switch_page(navigation_page_path(next_page))
+                st.switch_page(dungeon_file_page(next_page))

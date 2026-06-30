@@ -1,20 +1,28 @@
 from __future__ import annotations
 
+import importlib.util
+from pathlib import Path
+
+
+def _bootstrap_pkg_path() -> None:
+    here = Path(__file__).resolve().parent
+    bootstrap = (here.parent if here.name == "level_pages" else here) / "_bootstrap.py"
+    spec = importlib.util.spec_from_file_location("_agent_dungeon_bootstrap", bootstrap)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"找不到 bootstrap：{bootstrap}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+
+_bootstrap_pkg_path()
+
 import streamlit as st
 
-from agent_panel import append_assistant_message
-from auth.session import get_auth_user
-from dungeon_context import build_dungeon_extra_context
-from dungeon_shell import dungeon_shell
-from forge_challenges import (
-    LEGACY_ANSWER_CODES,
-    VOICE_FORGE_CHALLENGES,
-    challenge_codes_from_stored,
-)
-from forge_runner import run_forge_lab_code
-from mission_complete_ui import render_mission_complete_banner
-from page_bootstrap import init_dungeon_environment, require_dungeon_login
-from progress import (
+from agent_dungeon.agent.agent_panel import append_assistant_message
+from agent_dungeon.auth.session import get_auth_user
+from agent_dungeon.core.dungeon_context import build_dungeon_extra_context
+from agent_dungeon.core.page_bootstrap import init_dungeon_environment, require_dungeon_login
+from agent_dungeon.core.progress import (
     DungeonProgress,
     challenge_complete,
     mark_forge_lab_complete,
@@ -24,15 +32,23 @@ from progress import (
     skill_forge_complete,
     voice_module_online,
 )
-from section_heading_ui import render_level_heading, render_numbered_section_heading
-from shell_ui import (
+from agent_dungeon.forge.challenges import (
+    LEGACY_ANSWER_CODES,
+    VOICE_FORGE_CHALLENGES,
+    challenge_codes_from_stored,
+)
+from agent_dungeon.forge.runner import run_forge_lab_code
+from agent_dungeon.forge.skill_forge_ui import render_skill_forge
+from agent_dungeon.ui.dungeon_shell import dungeon_shell
+from agent_dungeon.ui.mission_complete_ui import render_mission_complete_banner
+from agent_dungeon.ui.section_heading_ui import render_level_heading, render_numbered_section_heading
+from agent_dungeon.ui.shell_ui import (
     load_page_data,
     render_dungeon_hint,
     render_mission_demo,
     save_page_data,
 )
-from skill_forge_ui import render_skill_forge
-from skills_panel import render_related_python_skills
+from agent_dungeon.ui.skills_panel import render_related_python_skills
 
 DEFAULT_LAB_CODE = """def speak():
     print("Hello, I am your AI assistant!")

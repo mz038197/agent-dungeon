@@ -5,7 +5,7 @@ import io
 from contextlib import redirect_stdout
 from dataclasses import dataclass
 
-from forge_challenges import CHALLENGE_IDS
+from agent_dungeon.forge.challenges import CHALLENGE_IDS
 
 _SAFE_BUILTINS = {
     "print": print,

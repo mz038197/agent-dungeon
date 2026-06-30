@@ -10,8 +10,8 @@ from typing import Any
 import streamlit as st
 import streamlit.components.v1 as components
 
-from auth.session import get_auth_user
-from cloud_paths import page_data_path, paths_for_user, template_page_data_path
+from agent_dungeon.auth.session import get_auth_user
+from agent_dungeon.core.cloud_paths import LEVEL_PAGES_DIR, page_data_path, paths_for_user, template_page_data_path
 
 _PAGE_FILE_PATTERN = re.compile(r"^\d+_.+\.py$")
 
@@ -224,6 +224,7 @@ def page_url_from_relative_page(relative_path: str) -> str:
 
 
 _OVERVIEW_PAGE: Any = None
+_FILE_PAGE_REGISTRY: dict[str, Any] = {}
 
 
 def overview_page() -> Any:
@@ -233,20 +234,29 @@ def overview_page() -> Any:
     return _OVERVIEW_PAGE
 
 
+def dungeon_file_page(relative_path: str) -> Any:
+    """Return st.Page for a registered level script (safe for st.switch_page)."""
+    key = navigation_page_path(relative_path)
+    page = _FILE_PAGE_REGISTRY.get(key)
+    if page is None:
+        raise RuntimeError(f"未註冊的關卡頁：{key}")
+    return page
+
+
 def build_navigation_pages(
     *,
     app_root: Path,
     overview_callable: Callable[[], None],
 ) -> dict[str, list[Any]]:
-    global _OVERVIEW_PAGE
+    global _OVERVIEW_PAGE, _FILE_PAGE_REGISTRY
     _OVERVIEW_PAGE = st.Page(overview_callable, title="總覽", default=True)
-    file_pages = [
-        st.Page(
-            navigation_page_path(path.relative_to(app_root).as_posix()),
-            title=page_title_from_path(path),
-        )
-        for path in discover_file_pages(app_root / "pages")
-    ]
+    _FILE_PAGE_REGISTRY.clear()
+    file_pages: list[Any] = []
+    for path in discover_file_pages(LEVEL_PAGES_DIR):
+        rel = navigation_page_path(path.relative_to(app_root).as_posix())
+        page_obj = st.Page(path.resolve(), title=page_title_from_path(path))
+        _FILE_PAGE_REGISTRY[rel] = page_obj
+        file_pages.append(page_obj)
     return {
         "Dungeon": [
             _OVERVIEW_PAGE,
@@ -320,15 +330,22 @@ _HIDE_CHROME_SELECTORS = (
 _FLUSH_TOP_CSS = """
   .stApp,
   [data-testid="stAppViewContainer"],
+  [data-testid="stAppViewContainer"] > section,
   section.stMain,
   section.main {
     padding-top: 0 !important;
     margin-top: 0 !important;
+    padding-bottom: 0 !important;
+    margin-bottom: 0 !important;
   }
   header.stAppHeader,
   [data-testid="stAppHeader"],
   [data-testid="stToolbar"],
   [data-testid="stDecoration"] {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 0 !important;
     display: none !important;
     height: 0 !important;
     min-height: 0 !important;
@@ -342,18 +359,28 @@ _FLUSH_TOP_CSS = """
   .stAppViewBlockContainer,
   section.stMain .block-container,
   section.main .block-container,
-  [data-testid="stMainBlockContainer"] {
+  [data-testid="stMainBlockContainer"],
+  [data-testid="stVerticalBlockBorderWrapper"] {
     padding-top: 0 !important;
     margin-top: 0 !important;
+    padding-bottom: 0 !important;
+    margin-bottom: 0 !important;
   }
   [data-testid="stMainBlockContainer"].dungeon-shell-flush {
     margin-top: calc(-1 * var(--dungeon-shell-offset, 0px)) !important;
+  }
+  [data-testid="stAppViewBlockContainer"].dungeon-shell-flush-bottom,
+  [data-testid="stMainBlockContainer"].dungeon-shell-flush-bottom {
+    padding-bottom: 0 !important;
+    margin-bottom: calc(-1 * var(--dungeon-shell-bottom-offset, 0px)) !important;
   }
 """
 
 _STYLE_MARKER_COLLAPSE = """
   [data-testid="stElementContainer"]:has(#dungeon-shell-anchor),
-  [data-testid="stElementContainer"]:has(#dungeon-footer-anchor) {
+  [data-testid="stElementContainer"]:has(#dungeon-footer-anchor),
+  [data-testid="stElementContainer"]:has(#dungeon-css-anchor),
+  [data-testid="stElementContainer"]:has(#dungeon-paint-anchor) {
     display: none !important;
     height: 0 !important;
     min-height: 0 !important;
@@ -408,6 +435,14 @@ def inject_css_block(css: str, *, element_id: str = "dungeon-app-css") -> None:
     host.document.head.appendChild(el);
   }}
   el.textContent = {json.dumps(css)};
+  const iframe = window.frameElement;
+  const container = iframe?.closest('[data-testid="stElementContainer"]');
+  if (container && !container.querySelector("#dungeon-css-anchor")) {{
+    const marker = host.document.createElement("span");
+    marker.id = "dungeon-css-anchor";
+    marker.hidden = true;
+    container.appendChild(marker);
+  }}
 }})();
 </script>
 """,
@@ -421,7 +456,12 @@ def shell_base_css(*, extra_css: str = "") -> str:
   {hide_rule} {{ display: none !important; }}
   {_FLUSH_TOP_CSS}
   {_STYLE_MARKER_COLLAPSE}
-  .block-container {{ padding-top: 0; }}
+  .block-container {{
+    padding-top: 0 !important;
+    margin-top: 0 !important;
+    padding-bottom: 0 !important;
+    margin-bottom: 0 !important;
+  }}
   .studio-card {{
       border: 1px solid rgba(250, 250, 250, 0.12);
       border-radius: 18px;

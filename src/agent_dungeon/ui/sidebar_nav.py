@@ -7,23 +7,23 @@ from typing import Literal
 
 import streamlit as st
 
-from auth.session import clear_auth, get_auth_user
-from cloud_paths import APP_ROOT
-from progress import DungeonProgress, ModuleStatus, agent_level_view, load_user_progress
-from shell_ui import navigation_page_path, overview_page
+from agent_dungeon.auth.session import clear_auth, get_auth_user
+from agent_dungeon.core.cloud_paths import APP_ROOT
+from agent_dungeon.core.progress import DungeonProgress, ModuleStatus, agent_level_view, load_user_progress
+from agent_dungeon.ui.shell_ui import dungeon_file_page, navigation_page_path, overview_page
 
 ModuleId = Literal[
     "voice", "brain", "memory", "identity", "tools", "planning", "team"
 ]
 
 MODULE_DEFS: tuple[dict[str, object], ...] = (
-    {"id": "voice", "label": "Voice", "icon": "🎙️", "page": "pages/0_Voice.py"},
-    {"id": "brain", "label": "Brain", "icon": "🧠", "page": "pages/1_Brain.py"},
-    {"id": "memory", "label": "Memory", "icon": "📗", "page": "pages/2_Memory.py"},
-    {"id": "identity", "label": "Identity", "icon": "🤖", "page": "pages/3_Identity.py"},
-    {"id": "tools", "label": "Tools", "icon": "🛠️", "page": "pages/4_Tools.py"},
-    {"id": "planning", "label": "Planning", "icon": "🗺️", "page": "pages/5_Planning.py"},
-    {"id": "team", "label": "Team", "icon": "👥", "page": "pages/6_Team.py"},
+    {"id": "voice", "label": "Voice", "icon": "🎙️", "page": "level_pages/0_Voice.py"},
+    {"id": "brain", "label": "Brain", "icon": "🧠", "page": "level_pages/1_Brain.py"},
+    {"id": "memory", "label": "Memory", "icon": "📗", "page": "level_pages/2_Memory.py"},
+    {"id": "identity", "label": "Identity", "icon": "🤖", "page": "level_pages/3_Identity.py"},
+    {"id": "tools", "label": "Tools", "icon": "🛠️", "page": "level_pages/4_Tools.py"},
+    {"id": "planning", "label": "Planning", "icon": "🗺️", "page": "level_pages/5_Planning.py"},
+    {"id": "team", "label": "Team", "icon": "👥", "page": "level_pages/6_Team.py"},
 )
 
 
@@ -134,7 +134,7 @@ def render_left_sidebar(*, current_module: ModuleId | None, progress: DungeonPro
         if clickable:
             with cols[2]:
                 if st.button(pill, key=f"nav_module_{item.id}", use_container_width=True):
-                    st.switch_page(navigation_page_path(item.page))
+                    st.switch_page(dungeon_file_page(item.page))
         else:
             cols[2].markdown(
                 f"<span class='dungeon-module-pill locked'>{pill}</span>",

@@ -1,11 +1,27 @@
 from __future__ import annotations
 
+import importlib.util
+from pathlib import Path
+
+
+def _bootstrap_pkg_path() -> None:
+    here = Path(__file__).resolve().parent
+    bootstrap = (here.parent if here.name == "level_pages" else here) / "_bootstrap.py"
+    spec = importlib.util.spec_from_file_location("_agent_dungeon_bootstrap", bootstrap)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"找不到 bootstrap：{bootstrap}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+
+_bootstrap_pkg_path()
+
 import streamlit as st
 
-from cloud_paths import APP_ROOT
-from dungeon_shell import dungeon_shell
-from page_bootstrap import init_dungeon_environment, require_dungeon_login
-from shell_ui import build_navigation_pages, format_extra_context
+from agent_dungeon.core.cloud_paths import APP_ROOT
+from agent_dungeon.core.page_bootstrap import init_dungeon_environment, require_dungeon_login
+from agent_dungeon.ui.dungeon_shell import dungeon_shell
+from agent_dungeon.ui.shell_ui import build_navigation_pages, format_extra_context
 
 init_dungeon_environment()
 

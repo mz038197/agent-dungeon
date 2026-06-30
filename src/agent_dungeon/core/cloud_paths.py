@@ -5,7 +5,8 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-APP_ROOT = Path(__file__).resolve().parent
+APP_ROOT = Path(__file__).resolve().parent.parent
+LEVEL_PAGES_DIR = APP_ROOT / "level_pages"
 
 
 def is_cloud_mode() -> bool:

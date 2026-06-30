@@ -8,7 +8,7 @@ from typing import Any
 from openai_tts import Settings
 from openai_tts.settings import MAX_TTS_SPEED, MIN_TTS_SPEED
 
-from cloud_paths import peas_agent_home, shared_config_path, shared_tts_config_path
+from agent_dungeon.core.cloud_paths import peas_agent_home, shared_config_path, shared_tts_config_path
 
 DEFAULT_TTS_BASE_URL = "https://ai.vanscoding.com/v1"
 DEFAULT_TTS_MODEL = "openai@gpt-4o-mini-tts"

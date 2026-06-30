@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from cloud_paths import page_data_path, paths_for_user
-from progress import (
+from agent_dungeon.core.cloud_paths import page_data_path, paths_for_user
+from agent_dungeon.core.progress import (
     DungeonProgress,
     ModuleStatus,
     agent_level_view,
@@ -9,7 +9,7 @@ from progress import (
     skill_forge_complete,
     voice_module_online,
 )
-from sidebar_nav import MODULE_DEFS, ModuleId
+from agent_dungeon.ui.sidebar_nav import MODULE_DEFS, ModuleId
 
 
 def _status_label(status: ModuleStatus) -> str:
@@ -69,7 +69,7 @@ def build_dungeon_extra_context(
     current_module: ModuleId | None = None,
     **page_fields: object,
 ) -> str:
-    from shell_ui import format_extra_context
+    from agent_dungeon.ui.shell_ui import format_extra_context
 
     fields: dict[str, object] = {}
     fields.update(build_left_sidebar_context(progress, current_module=current_module))

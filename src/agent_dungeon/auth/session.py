@@ -6,8 +6,8 @@ import hashlib
 import re
 from dataclasses import dataclass
 
-from auth.google_oauth import GoogleOAuthService, GoogleUserClaims
-from env_loader import load_local_env
+from agent_dungeon.auth.google_oauth import GoogleOAuthService, GoogleUserClaims
+from agent_dungeon.core.env_loader import load_local_env
 
 
 AUTH_SESSION_KEY = "auth_user"

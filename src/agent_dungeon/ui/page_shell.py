@@ -4,7 +4,7 @@ from collections.abc import Callable
 
 import streamlit as st
 
-from agent_panel import render_chat_panel
+from agent_dungeon.agent.agent_panel import render_chat_panel
 
 
 def page_shell(

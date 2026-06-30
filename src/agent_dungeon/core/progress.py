@@ -7,9 +7,9 @@ from pathlib import Path
 
 import yaml
 
-from cloud_paths import paths_for_user
+from agent_dungeon.core.cloud_paths import APP_ROOT, paths_for_user
 
-QUESTS_PATH = Path(__file__).resolve().parent / "quests" / "quests.yaml"
+QUESTS_PATH = APP_ROOT / "quests" / "quests.yaml"
 
 MODULE_IDS = (
     "voice",
