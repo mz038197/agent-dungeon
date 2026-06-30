@@ -36,11 +36,13 @@ from agent_dungeon.core.progress import (
 from agent_dungeon.forge.brain_runner import run_brain_forge_lab_code
 from agent_dungeon.forge.challenges import (
     BRAIN_FORGE_CHALLENGES,
+    BRAIN_LEGACY_LAB_CODE,
+    EMPTY_FORGE_LAB_CODE,
     brain_challenge_codes_from_stored,
     challenge_code_for_persist,
     forge_editor_code_needs_refresh,
+    resolve_stored_lab_code,
 )
-from agent_dungeon.forge.llm_provider import DEFAULT_BRAIN_MODEL
 from agent_dungeon.forge.skill_forge_ui import BRAIN_FORGE_CONFIG, render_skill_forge
 from agent_dungeon.ui.dungeon_shell import dungeon_shell
 from agent_dungeon.ui.mission_complete_ui import render_mission_complete_banner
@@ -55,12 +57,7 @@ from agent_dungeon.ui.skills_panel import render_related_python_skills
 
 DEFAULT_LAB_PROMPT = "你是一位英文助教，用簡單英文回答。"
 
-DEFAULT_LAB_CODE = f"""prompt = "{DEFAULT_LAB_PROMPT}"
-llm = Brain(model="{DEFAULT_BRAIN_MODEL}")
-question = input("你想問什麼？ ")
-response = llm.invoke(f"{{prompt}}\\n\\n問題：{{question}}")
-print(response)
-"""
+DEFAULT_LAB_CODE = EMPTY_FORGE_LAB_CODE
 
 PAGE_NAME = "Brain"
 STDOUT_KEY = "brain_forge_stdout"
@@ -156,16 +153,13 @@ def _challenge_stdout_from_state(page_data: dict) -> dict[str, str]:
     return stdout_map
 
 
-def _lab_code_from_state(page_data: dict, *, forge_done: bool, progress: DungeonProgress) -> str:
+def _lab_code_from_state(page_data: dict, *, lab_done: bool) -> str:
     raw = page_data.get("code")
-    if isinstance(raw, str) and raw.strip():
-        return raw
-    if forge_done:
-        codes = _challenge_codes_from_state(page_data, progress)
-        c3 = codes.get("c3", "").strip()
-        if c3 and "invoke" in c3:
-            return c3
-    return DEFAULT_LAB_CODE
+    return resolve_stored_lab_code(
+        raw if isinstance(raw, str) else None,
+        legacy=BRAIN_LEGACY_LAB_CODE,
+        lab_done=lab_done,
+    )
 
 
 def _persist_brain_page_data(
@@ -229,7 +223,7 @@ def render_level(progress: DungeonProgress) -> str:
     challenge_codes = _challenge_codes_from_state(page_data, progress)
     _sync_forge_code_session(challenge_codes, progress)
     challenge_stdout = _challenge_stdout_from_state(page_data)
-    lab_code = _lab_code_from_state(page_data, forge_done=forge_done, progress=progress)
+    lab_code = _lab_code_from_state(page_data, lab_done=lab_done)
     _sync_lab_code_session(lab_code, lab_done=lab_done, forge_done=forge_done)
 
     preview_state = dict(st.session_state.get("agent_column_preview") or {})

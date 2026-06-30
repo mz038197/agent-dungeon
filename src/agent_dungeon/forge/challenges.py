@@ -82,6 +82,39 @@ BRAIN_FORGE_CHALLENGES: tuple[ForgeChallenge, ...] = (
 
 BRAIN_LEGACY_ANSWER_CODES: dict[str, str] = {}
 
+EMPTY_FORGE_LAB_CODE = ""
+
+VOICE_LEGACY_LAB_CODE = """def speak():
+    print("Hello, I am your AI assistant!")
+    print("Nice to meet you!")
+
+speak()
+""".strip()
+
+_BRAIN_LEGACY_LAB_PROMPT = "你是一位英文助教，用簡單英文回答。"
+
+BRAIN_LEGACY_LAB_CODE = f"""prompt = "{_BRAIN_LEGACY_LAB_PROMPT}"
+llm = Brain(model="{DEFAULT_BRAIN_MODEL}")
+question = input("你想問什麼？ ")
+response = llm.invoke(f"{{prompt}}\\n\\n問題：{{question}}")
+print(response)
+""".strip()
+
+
+def resolve_stored_lab_code(
+    stored: str | None,
+    *,
+    legacy: str,
+    lab_done: bool,
+) -> str:
+    if lab_done:
+        return stored if isinstance(stored, str) else EMPTY_FORGE_LAB_CODE
+    if not isinstance(stored, str) or not stored.strip():
+        return EMPTY_FORGE_LAB_CODE
+    if stored.strip() == legacy.strip():
+        return EMPTY_FORGE_LAB_CODE
+    return stored
+
 
 def challenge_by_id(challenge_id: str, *, level: str = "voice") -> ForgeChallenge | None:
     challenges = BRAIN_FORGE_CHALLENGES if level == "brain" else VOICE_FORGE_CHALLENGES

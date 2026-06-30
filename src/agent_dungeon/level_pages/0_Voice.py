@@ -33,10 +33,13 @@ from agent_dungeon.core.progress import (
     voice_module_online,
 )
 from agent_dungeon.forge.challenges import (
+    EMPTY_FORGE_LAB_CODE,
     VOICE_FORGE_CHALLENGES,
+    VOICE_LEGACY_LAB_CODE,
     challenge_code_for_persist,
     challenge_codes_from_stored,
     forge_editor_code_needs_refresh,
+    resolve_stored_lab_code,
 )
 from agent_dungeon.forge.runner import run_forge_lab_code
 from agent_dungeon.forge.skill_forge_ui import render_skill_forge
@@ -51,12 +54,7 @@ from agent_dungeon.ui.shell_ui import (
 )
 from agent_dungeon.ui.skills_panel import render_related_python_skills
 
-DEFAULT_LAB_CODE = """def speak():
-    print("Hello, I am your AI assistant!")
-    print("Nice to meet you!")
-
-speak()
-"""
+DEFAULT_LAB_CODE = EMPTY_FORGE_LAB_CODE
 
 PAGE_NAME = "Voice"
 STDOUT_KEY = "voice_forge_stdout"
@@ -155,11 +153,13 @@ def _challenge_stdout_from_state(page_data: dict) -> dict[str, str]:
     return stdout_map
 
 
-def _lab_code_from_state(page_data: dict) -> str:
+def _lab_code_from_state(page_data: dict, *, lab_done: bool) -> str:
     raw = page_data.get("code")
-    if isinstance(raw, str) and raw.strip():
-        return raw
-    return DEFAULT_LAB_CODE
+    return resolve_stored_lab_code(
+        raw if isinstance(raw, str) else None,
+        legacy=VOICE_LEGACY_LAB_CODE,
+        lab_done=lab_done,
+    )
 
 
 def _persist_voice_page_data(
@@ -205,7 +205,7 @@ def render_level(progress: DungeonProgress) -> str:
     challenge_codes = _challenge_codes_from_state(page_data, progress)
     _sync_forge_code_session(challenge_codes, progress)
     challenge_stdout = _challenge_stdout_from_state(page_data)
-    lab_code = _lab_code_from_state(page_data)
+    lab_code = _lab_code_from_state(page_data, lab_done=lab_done)
     _sync_lab_code_session(lab_code, lab_done=lab_done, forge_done=forge_done)
     st.session_state["agent_column_preview"] = {
         "challenge_codes": challenge_codes,
