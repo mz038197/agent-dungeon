@@ -12,16 +12,19 @@ from agent_dungeon.auth.cookie_session import (
 from agent_dungeon.auth.session import AuthUser, local_dev_auth_bypass
 
 
-_COOKIE_MANAGER_STATE_KEY = "dungeon_auth_cookie_manager"
+# Instance slot must differ from the widget key: CookieManager stores cookie dict
+# in st.session_state[widget_key], which would overwrite a manager stored there.
+_COOKIE_MANAGER_INSTANCE_KEY = "_dungeon_auth_cookie_manager_instance"
+_COOKIE_MANAGER_WIDGET_KEY = "dungeon_auth_cookie_manager"
 
 
 def _cookie_manager() -> stx.CookieManager:
     """Per-session CookieManager singleton (widgets must not live in @st.cache_*)."""
-    if _COOKIE_MANAGER_STATE_KEY not in st.session_state:
-        st.session_state[_COOKIE_MANAGER_STATE_KEY] = stx.CookieManager(
-            key="dungeon_auth_cookie_manager"
-        )
-    return st.session_state[_COOKIE_MANAGER_STATE_KEY]
+    manager = st.session_state.get(_COOKIE_MANAGER_INSTANCE_KEY)
+    if not isinstance(manager, stx.CookieManager):
+        manager = stx.CookieManager(key=_COOKIE_MANAGER_WIDGET_KEY)
+        st.session_state[_COOKIE_MANAGER_INSTANCE_KEY] = manager
+    return manager
 
 
 def auth_cookie_enabled() -> bool:
