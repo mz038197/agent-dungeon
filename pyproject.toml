@@ -9,6 +9,7 @@ dependencies = [
     "httpx>=0.28",
     "openai-tts @ git+https://github.com/mz038197/openai-tts.git",
     "peas-agent-core @ git+https://github.com/mz038197/peas-agent-core.git",
+    "extra-streamlit-components>=0.1.71",
     "st-multimodal-chatinput",
     "streamlit>=1.40",
     "pyyaml>=6.0",

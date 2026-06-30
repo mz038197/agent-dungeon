@@ -18,6 +18,7 @@ name = "agent-dungeon"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "extra-streamlit-components" },
     { name = "google-auth" },
     { name = "httpx" },
     { name = "openai-tts" },
@@ -34,6 +35,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "extra-streamlit-components", specifier = ">=0.1.71" },
     { name = "google-auth", specifier = ">=2.0" },
     { name = "httpx", specifier = ">=0.28" },
     { name = "openai-tts", git = "https://github.com/mz038197/openai-tts.git" },
@@ -503,6 +505,18 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/04/97/c18ab70ec27eed02f6ba7b00b3d6236657df7cabbc7175533ff5b62f2147/dulwich-1.2.6-cp314-cp314t-win32.whl", hash = "sha256:27db364f2f3cf5b0dddd44d6c2ae9a20f6021e2bae8b1268fa689076f0192244", size = 1024467, upload-time = "2026-05-31T14:32:48.476Z" },
     { url = "https://files.pythonhosted.org/packages/41/8c/7f49d256a813ab799fbce519a37857d75201c7c02b06b1a65fd989ec2ff2/dulwich-1.2.6-cp314-cp314t-win_amd64.whl", hash = "sha256:fae59c5e345f5ca234c85d157f1c7d5e0086126b45b5f7cfa66ffe41d049fdd6", size = 1083682, upload-time = "2026-05-31T14:32:49.881Z" },
     { url = "https://files.pythonhosted.org/packages/24/15/61bd455d33979584f19d3a6e0b49b49e0d891bc680fc8cc7b028aea7360d/dulwich-1.2.6-py3-none-any.whl", hash = "sha256:8d8175dbe4feaf62bcafc8708448bfe223b4dfc71609be25c0cf2b0962abc36c", size = 688260, upload-time = "2026-05-31T14:32:51.285Z" },
+]
+
+[[package]]
+name = "extra-streamlit-components"
+version = "0.1.81"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "streamlit" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/24/49/9b47a3450034d74259f9d4887d85be4e6a771bc21da467b253323d78c4d9/extra_streamlit_components-0.1.81.tar.gz", hash = "sha256:eb9beb7bacfe8b3d238f1888a21c78ac6cfa569341be484bca08c3ea0b15f20d", size = 2250141, upload-time = "2025-08-17T18:12:33.606Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/fd/8d/d2f1eeb52c50c990d14fd91bea35157890bb791c46b3f2bebaa5eef4bdf6/extra_streamlit_components-0.1.81-py3-none-any.whl", hash = "sha256:11a4651dbd03cac04edfbb8711757b1d10e3cdf280b8fa3a43f970d05e684619", size = 2278499, upload-time = "2025-08-17T18:12:30.803Z" },
 ]
 
 [[package]]
