@@ -39,8 +39,16 @@ PUBLIC_URL=http://127.0.0.1:8501
 
 ```powershell
 cd C:\Users\mz038\Desktop\peas-agent\agent_dungeon
-uv sync
-uv run streamlit run app.py
+uv sync --extra dev
+uv run agent-dungeon
+```
+
+本機臨時腳本（如 Playwright 驗 UI）請放在 repo 根的 `scratch/`（已 gitignore，不進版控）。
+
+手動啟動（repo 根目錄）：
+
+```powershell
+uv run streamlit run src/agent_dungeon/app.py
 ```
 
 ## 驗收
