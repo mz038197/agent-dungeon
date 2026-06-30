@@ -2,7 +2,17 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from agent_dungeon.forge.llm_provider import DEFAULT_BRAIN_MODEL
+
 CHALLENGE_IDS = ("c1", "c2", "c3")
+
+VOICE_FORGE_CHALLENGE_IDS = CHALLENGE_IDS
+BRAIN_FORGE_CHALLENGE_IDS = CHALLENGE_IDS
+
+_BRAIN_C1_LEGACY_STARTER = """# 讀取使用者輸入
+question = input("你想問什麼？ ")
+print(question)
+""".strip()
 
 
 @dataclass(frozen=True)
@@ -11,6 +21,7 @@ class ForgeChallenge:
     label: str
     title: str
     default_code: str
+    editor_hint: str = ""
 
 
 VOICE_FORGE_CHALLENGES: tuple[ForgeChallenge, ...] = (
@@ -19,24 +30,62 @@ VOICE_FORGE_CHALLENGES: tuple[ForgeChallenge, ...] = (
         label="Challenge 1",
         title="認識 print()",
         default_code='# 使用 print 函式 輸出 "Hello" !',
+        editor_hint='使用 print 函式輸出 "Hello" !',
     ),
     ForgeChallenge(
         id="c2",
         label="Challenge 2",
         title="建立 function",
         default_code='# 定義 speak() 函式，在函式內輸出 Hello',
+        editor_hint="定義 speak() 函式，在函式內輸出 Hello",
     ),
     ForgeChallenge(
         id="c3",
         label="Final Challenge",
         title="讓 Agent 說話！",
         default_code='# 定義 speak() 函式，並呼叫 speak() 輸出 Hello!（記得驚嘆號）',
+        editor_hint="定義 speak() 函式，並呼叫 speak() 輸出 Hello!（記得驚嘆號）",
     ),
 )
 
+_BRAIN_C2_SUFFIX = f"""# --- 本關：建立 Brain（選一個 model）---
+llm = Brain(model="{DEFAULT_BRAIN_MODEL}")"""
 
-def challenge_by_id(challenge_id: str) -> ForgeChallenge | None:
-    for challenge in VOICE_FORGE_CHALLENGES:
+_BRAIN_C3_SUFFIX = """# --- 本關：完成 Brain 安裝 ---
+# 呼叫 llm.invoke(question)，並 print Brain 的回覆
+response = llm.invoke(question)
+print(response)"""
+
+BRAIN_FORGE_CHALLENGES: tuple[ForgeChallenge, ...] = (
+    ForgeChallenge(
+        id="c1",
+        label="Challenge 1",
+        title="讀取使用者輸入",
+        default_code="# 讀取使用者輸入：用 input() 取得 question，再用 print 顯示讀到的內容",
+        editor_hint="用 input() 讀取問題，再用 print 顯示 input() 讀到的內容",
+    ),
+    ForgeChallenge(
+        id="c2",
+        label="Challenge 2",
+        title="建立 Brain",
+        default_code=_BRAIN_C2_SUFFIX,
+        editor_hint='在上方程式碼下方，建立 Brain（llm = Brain(model="...")）',
+    ),
+    ForgeChallenge(
+        id="c3",
+        label="Final Challenge",
+        title="完成 Brain 安裝",
+        default_code=_BRAIN_C3_SUFFIX,
+        editor_hint="整合上方步驟：invoke(question) 後 print Brain 的回覆",
+    ),
+)
+
+BRAIN_LEGACY_ANSWER_CODES: dict[str, str] = {}
+
+
+def challenge_by_id(challenge_id: str, *, level: str = "voice") -> ForgeChallenge | None:
+    challenges = BRAIN_FORGE_CHALLENGES if level == "brain" else VOICE_FORGE_CHALLENGES
+    for challenge in challenges:
         if challenge.id == challenge_id:
             return challenge
     return None
@@ -64,6 +113,131 @@ def resolve_stored_challenge_code(
     return stored
 
 
+def _brain_stored_needs_carry_forward(
+    challenge: ForgeChallenge,
+    stored: str,
+    *,
+    default: str,
+    completed: bool,
+) -> bool:
+    if completed:
+        return False
+    stripped = stored.strip()
+    if not stripped:
+        return True
+    if stripped == challenge.default_code.strip():
+        return True
+    if challenge.id == "c1" and stripped == _BRAIN_C1_LEGACY_STARTER:
+        return True
+    if challenge.id == "c2" and "input(" not in stripped:
+        return True
+    if challenge.id == "c3":
+        if "input(" not in stripped or "Brain(" not in stripped:
+            return True
+        if "invoke" not in stripped and stripped == challenge.default_code.strip():
+            return True
+    if stripped == default.strip():
+        return False
+    if challenge.id in {"c2", "c3"} and stripped == challenge.default_code.strip():
+        return True
+    return False
+
+
+def resolve_stored_brain_challenge_code(
+    challenge: ForgeChallenge,
+    stored: str | None,
+    *,
+    default: str,
+    completed: bool,
+) -> str:
+    if not isinstance(stored, str) or not stored.strip():
+        return default
+    if not completed and stored == LEGACY_ANSWER_CODES.get(challenge.id):
+        return default
+    if _brain_stored_needs_carry_forward(
+        challenge,
+        stored,
+        default=default,
+        completed=completed,
+    ):
+        return default
+    return stored
+
+
+def brain_editor_code_needs_refresh(
+    challenge: ForgeChallenge,
+    current: str,
+    *,
+    expected: str,
+    completed: bool,
+) -> bool:
+    if completed:
+        return False
+    stripped = current.strip()
+    if not stripped:
+        return True
+    if "#" not in stripped:
+        return True
+    return _brain_stored_needs_carry_forward(
+        challenge,
+        stripped,
+        default=expected,
+        completed=False,
+    )
+
+
+def voice_editor_code_needs_refresh(
+    challenge: ForgeChallenge,
+    current: str,
+    *,
+    expected: str,
+    completed: bool,
+) -> bool:
+    if completed:
+        return False
+    stripped = current.strip()
+    if not stripped:
+        return True
+    if stripped == LEGACY_ANSWER_CODES.get(challenge.id):
+        return True
+    return False
+
+
+def forge_editor_code_needs_refresh(
+    challenge: ForgeChallenge,
+    current: str,
+    *,
+    expected: str,
+    completed: bool,
+    level: str,
+) -> bool:
+    if level == "brain":
+        return brain_editor_code_needs_refresh(
+            challenge,
+            current,
+            expected=expected,
+            completed=completed,
+        )
+    return voice_editor_code_needs_refresh(
+        challenge,
+        current,
+        expected=expected,
+        completed=completed,
+    )
+
+
+def challenge_code_for_persist(
+    session_value: str,
+    *,
+    default: str,
+    completed: bool,
+) -> str:
+    raw = str(session_value)
+    if completed or raw.strip():
+        return raw
+    return default
+
+
 def challenge_codes_from_stored(
     stored: dict | None,
     *,
@@ -80,4 +254,44 @@ def challenge_codes_from_stored(
             default=challenge.default_code,
             completed=done.get(challenge.id, False),
         )
+    return codes
+
+
+def _carry_forward_brain_code(
+    challenge: ForgeChallenge,
+    *,
+    prior_code: str,
+) -> str:
+    prior = prior_code.strip()
+    if not prior:
+        return challenge.default_code
+    suffix = challenge.default_code.strip()
+    return f"{prior}\n\n{suffix}"
+
+
+def brain_challenge_codes_from_stored(
+    stored: dict | None,
+    *,
+    completed: dict[str, bool] | None = None,
+) -> dict[str, str]:
+    done = completed or {}
+    codes: dict[str, str] = {}
+    prior = ""
+    for challenge in BRAIN_FORGE_CHALLENGES:
+        default = (
+            _carry_forward_brain_code(challenge, prior_code=prior)
+            if prior
+            else challenge.default_code
+        )
+        stored_raw = stored.get(challenge.id) if isinstance(stored, dict) else None
+        codes[challenge.id] = resolve_stored_brain_challenge_code(
+            challenge,
+            stored_raw if isinstance(stored_raw, str) else None,
+            default=default,
+            completed=done.get(challenge.id, False),
+        )
+        if done.get(challenge.id, False):
+            prior = codes[challenge.id]
+        elif codes[challenge.id].strip():
+            prior = codes[challenge.id]
     return codes
