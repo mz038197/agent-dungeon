@@ -8,6 +8,7 @@ from pathlib import Path
 import yaml
 
 from agent_dungeon.core.cloud_paths import APP_ROOT, paths_for_user
+from agent_dungeon.forge.challenges import BRAIN_FORGE_CHALLENGE_IDS, VOICE_FORGE_CHALLENGE_IDS
 
 QUESTS_PATH = APP_ROOT / "quests" / "quests.yaml"
 
@@ -28,12 +29,19 @@ class ModuleStatus(StrEnum):
     COMPLETE = "complete"
 
 
-FORGE_CHALLENGE_IDS = ("c1", "c2", "c3")
+FORGE_CHALLENGE_IDS = VOICE_FORGE_CHALLENGE_IDS
 
 VOICE_LEVEL_ID = "1"
+BRAIN_LEVEL_ID = "2"
 
 CHALLENGE_XP = 33
 XP_PER_LEVEL = 100
+
+
+def forge_challenge_ids_for_level(level_id: str) -> tuple[str, ...]:
+    if level_id == BRAIN_LEVEL_ID:
+        return BRAIN_FORGE_CHALLENGE_IDS
+    return VOICE_FORGE_CHALLENGE_IDS
 
 
 def load_quests_config() -> dict:
@@ -148,13 +156,18 @@ def _progress_from_dict(raw: dict) -> DungeonProgress:
     if isinstance(levels_raw, dict):
         for key, value in levels_raw.items():
             if isinstance(value, dict):
+                level_id = str(key)
+                challenge_ids = forge_challenge_ids_for_level(level_id)
                 challenges_raw = value.get("forge_challenges")
                 challenges: dict[str, bool] = {}
                 if isinstance(challenges_raw, dict):
-                    for cid in FORGE_CHALLENGE_IDS:
+                    for cid in challenge_ids:
                         if cid in challenges_raw:
                             challenges[cid] = bool(challenges_raw[cid])
-                levels[str(key)] = LevelProgress(
+                    for cid, done in challenges_raw.items():
+                        if cid not in challenges and isinstance(cid, str):
+                            challenges[cid] = bool(done)
+                levels[level_id] = LevelProgress(
                     forge_lab_complete=bool(value.get("forge_lab_complete")),
                     mission_complete=bool(value.get("mission_complete")),
                     forge_challenges=challenges,
@@ -179,6 +192,21 @@ def _progress_from_dict(raw: dict) -> DungeonProgress:
 
 
 def _progress_to_dict(progress: DungeonProgress) -> dict:
+    levels_payload: dict[str, dict] = {}
+    for key, level in progress.levels.items():
+        challenge_ids = forge_challenge_ids_for_level(key)
+        levels_payload[key] = {
+            "forge_lab_complete": level.forge_lab_complete,
+            "mission_complete": level.mission_complete,
+            "forge_challenges": {
+                cid: level.forge_challenges.get(cid, False)
+                for cid in challenge_ids
+            },
+        }
+        for cid, done in level.forge_challenges.items():
+            if cid not in levels_payload[key]["forge_challenges"]:
+                levels_payload[key]["forge_challenges"][cid] = done
+
     return {
         "xp": progress.xp,
         "mp": progress.mp,
@@ -186,17 +214,7 @@ def _progress_to_dict(progress: DungeonProgress) -> dict:
         "rank_title": progress.rank_title,
         "next_rank_hint": progress.next_rank_hint,
         "modules": {key: status.value for key, status in progress.modules.items()},
-        "levels": {
-            key: {
-                "forge_lab_complete": level.forge_lab_complete,
-                "mission_complete": level.mission_complete,
-                "forge_challenges": {
-                    cid: level.forge_challenges.get(cid, False)
-                    for cid in FORGE_CHALLENGE_IDS
-                },
-            }
-            for key, level in progress.levels.items()
-        },
+        "levels": levels_payload,
     }
 
 
@@ -234,19 +252,33 @@ def next_rank_hint_for(progress: DungeonProgress) -> str:
     return AGENT_NEXT_QUEST_HINTS[level]
 
 
-def _voice_level_xp(progress: DungeonProgress) -> int:
-    level = progress.levels.get(VOICE_LEVEL_ID)
+def _level_xp(progress: DungeonProgress, level_id: str) -> int:
+    level = progress.levels.get(level_id)
     if level is None:
         return 0
-    done = sum(
-        1 for cid in FORGE_CHALLENGE_IDS if level.forge_challenges.get(cid, False)
-    )
-    return min(done * CHALLENGE_XP, XP_PER_LEVEL - 1)
+    challenge_ids = forge_challenge_ids_for_level(level_id)
+    done = sum(1 for cid in challenge_ids if level.forge_challenges.get(cid, False))
+    max_xp = XP_PER_LEVEL - 1
+    per_challenge = max_xp // max(len(challenge_ids), 1)
+    return min(done * per_challenge, max_xp)
+
+
+def _voice_level_xp(progress: DungeonProgress) -> int:
+    return _level_xp(progress, VOICE_LEVEL_ID)
+
+
+def _brain_level_xp(progress: DungeonProgress) -> int:
+    return _level_xp(progress, BRAIN_LEVEL_ID)
 
 
 def agent_level_view(progress: DungeonProgress) -> tuple[int, str, int, int]:
     level = agent_level(progress)
-    xp = _voice_level_xp(progress) if level == 0 else progress.xp
+    if level == 0:
+        xp = _voice_level_xp(progress)
+    elif level == 1:
+        xp = _brain_level_xp(progress)
+    else:
+        xp = progress.xp
     xp_to_next = progress.xp_to_next or XP_PER_LEVEL
     return level, next_rank_hint_for(progress), xp, xp_to_next
 
@@ -256,39 +288,74 @@ def _sync_progress_derived_fields(progress: DungeonProgress) -> None:
     if progress.modules.get("voice") == ModuleStatus.COMPLETE:
         if progress.modules.get("brain") == ModuleStatus.LOCKED:
             progress.modules["brain"] = ModuleStatus.IN_PROGRESS
+    if progress.modules.get("brain") == ModuleStatus.COMPLETE:
+        if progress.modules.get("memory") == ModuleStatus.LOCKED:
+            progress.modules["memory"] = ModuleStatus.IN_PROGRESS
     progress.rank_title = f"Lv. {level}"
     progress.next_rank_hint = next_rank_hint_for(progress)
     if level == 0:
         progress.xp = _voice_level_xp(progress)
+    elif level == 1:
+        progress.xp = _brain_level_xp(progress)
 
 
-def challenge_complete(progress: DungeonProgress, challenge_id: str) -> bool:
-    level = progress.levels.get(VOICE_LEVEL_ID)
+def _level_progress(progress: DungeonProgress, level_id: str) -> LevelProgress | None:
+    return progress.levels.get(level_id)
+
+
+def challenge_complete(
+    progress: DungeonProgress,
+    challenge_id: str,
+    *,
+    level_id: str = VOICE_LEVEL_ID,
+) -> bool:
+    level = _level_progress(progress, level_id)
     if level is None:
         return False
     return level.forge_challenges.get(challenge_id, False)
 
 
-def skill_forge_complete(progress: DungeonProgress) -> bool:
-    level = progress.levels.get(VOICE_LEVEL_ID)
+def skill_forge_complete(
+    progress: DungeonProgress,
+    *,
+    level_id: str = VOICE_LEVEL_ID,
+) -> bool:
+    level = _level_progress(progress, level_id)
     if level is None:
         return False
-    return all(level.forge_challenges.get(cid, False) for cid in FORGE_CHALLENGE_IDS)
+    challenge_ids = forge_challenge_ids_for_level(level_id)
+    return all(level.forge_challenges.get(cid, False) for cid in challenge_ids)
 
 
 def mark_forge_challenge_complete(
     progress: DungeonProgress,
     challenge_id: str,
+    *,
+    level_id: str = VOICE_LEVEL_ID,
 ) -> DungeonProgress:
-    if challenge_id not in FORGE_CHALLENGE_IDS:
+    challenge_ids = forge_challenge_ids_for_level(level_id)
+    if challenge_id not in challenge_ids:
         return progress
-    if agent_level(progress) > 0:
+
+    if level_id == VOICE_LEVEL_ID:
+        if agent_level(progress) > 0:
+            return progress
+    elif level_id == BRAIN_LEVEL_ID:
+        if progress.modules.get("voice") != ModuleStatus.COMPLETE:
+            return progress
+        if agent_level(progress) > 1:
+            return progress
+    else:
         return progress
-    level = progress.levels.setdefault(VOICE_LEVEL_ID, LevelProgress())
+
+    level = progress.levels.setdefault(level_id, LevelProgress())
     if level.forge_challenges.get(challenge_id, False):
         return progress
     level.forge_challenges[challenge_id] = True
-    progress.xp = _voice_level_xp(progress)
+    if level_id == VOICE_LEVEL_ID:
+        progress.xp = _voice_level_xp(progress)
+    elif level_id == BRAIN_LEVEL_ID:
+        progress.xp = _brain_level_xp(progress)
     return progress
 
 
@@ -304,8 +371,27 @@ def mark_forge_lab_complete(progress: DungeonProgress) -> DungeonProgress:
     return progress
 
 
+def mark_brain_forge_lab_complete(progress: DungeonProgress) -> DungeonProgress:
+    level = progress.levels.setdefault(BRAIN_LEVEL_ID, LevelProgress())
+    level.forge_lab_complete = True
+    level.mission_complete = True
+    progress.modules["brain"] = ModuleStatus.COMPLETE
+    progress.modules["memory"] = ModuleStatus.IN_PROGRESS
+    progress.xp = 0
+    progress.mp += 1
+    _sync_progress_derived_fields(progress)
+    return progress
+
+
 def voice_module_online(progress: DungeonProgress) -> bool:
     level = progress.levels.get(VOICE_LEVEL_ID)
     if level is None:
         return False
     return level.forge_lab_complete or progress.modules.get("voice") == ModuleStatus.COMPLETE
+
+
+def brain_module_online(progress: DungeonProgress) -> bool:
+    level = progress.levels.get(BRAIN_LEVEL_ID)
+    if level is None:
+        return False
+    return level.forge_lab_complete or progress.modules.get("brain") == ModuleStatus.COMPLETE
