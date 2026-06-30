@@ -33,9 +33,10 @@ from agent_dungeon.core.progress import (
     voice_module_online,
 )
 from agent_dungeon.forge.challenges import (
-    LEGACY_ANSWER_CODES,
     VOICE_FORGE_CHALLENGES,
+    challenge_code_for_persist,
     challenge_codes_from_stored,
+    forge_editor_code_needs_refresh,
 )
 from agent_dungeon.forge.runner import run_forge_lab_code
 from agent_dungeon.forge.skill_forge_ui import render_skill_forge
@@ -59,6 +60,7 @@ speak()
 
 PAGE_NAME = "Voice"
 STDOUT_KEY = "voice_forge_stdout"
+LAB_CODE_KEY = "voice_forge_lab_code"
 MISSION_CARD_HEIGHT = 300
 
 VOICE_RELATED_SKILLS = (
@@ -107,15 +109,39 @@ def _challenge_codes_from_state(page_data: dict, progress: DungeonProgress) -> d
     )
 
 
-def _sync_forge_code_session(challenge_codes: dict[str, str]) -> None:
-    for challenge in VOICE_FORGE_CHALLENGES:
+def _sync_forge_code_session(challenge_codes: dict[str, str], progress: DungeonProgress) -> None:
+    for index, challenge in enumerate(VOICE_FORGE_CHALLENGES):
         key = f"voice_forge_{challenge.id}_code"
         expected = challenge_codes[challenge.id]
-        current = st.session_state.get(key)
-        if current is None:
+        done = challenge_complete(progress, challenge.id)
+        if st.session_state.get(key) is None:
             st.session_state[key] = expected
-        elif current == LEGACY_ANSWER_CODES.get(challenge.id):
+            continue
+        if done:
+            continue
+        prev_complete = (
+            index > 0
+            and challenge_complete(progress, VOICE_FORGE_CHALLENGES[index - 1].id)
+        )
+        current = str(st.session_state[key])
+        unlock_empty = prev_complete and not current.strip()
+        if unlock_empty or forge_editor_code_needs_refresh(
+            challenge,
+            current,
+            expected=expected,
+            completed=done,
+            level="voice",
+        ):
             st.session_state[key] = expected
+
+
+def _sync_lab_code_session(lab_code: str, *, lab_done: bool, forge_done: bool) -> None:
+    if not forge_done or lab_done:
+        return
+    if st.session_state.get(LAB_CODE_KEY) is None or not str(
+        st.session_state.get(LAB_CODE_KEY, "")
+    ).strip():
+        st.session_state[LAB_CODE_KEY] = lab_code
 
 
 def _challenge_stdout_from_state(page_data: dict) -> dict[str, str]:
@@ -136,22 +162,36 @@ def _lab_code_from_state(page_data: dict) -> str:
     return DEFAULT_LAB_CODE
 
 
-def _persist_voice_page_data(google_sub: str | None, page_data: dict) -> None:
+def _persist_voice_page_data(
+    google_sub: str | None,
+    page_data: dict,
+    progress: DungeonProgress,
+    *,
+    lab_done: bool,
+) -> None:
     if google_sub is None:
         return
     codes = _default_challenge_codes()
     stdout_map: dict[str, str] = {}
     for challenge in VOICE_FORGE_CHALLENGES:
+        done = challenge_complete(progress, challenge.id)
         code_key = f"voice_forge_{challenge.id}_code"
         stdout_key = f"voice_forge_{challenge.id}_stdout"
         if code_key in st.session_state:
-            codes[challenge.id] = str(st.session_state[code_key])
+            codes[challenge.id] = challenge_code_for_persist(
+                str(st.session_state[code_key]),
+                default=challenge.default_code,
+                completed=done,
+            )
         if stdout_key in st.session_state:
             stdout_map[challenge.id] = str(st.session_state[stdout_key])
     page_data["challenges"] = codes
     page_data["stdout"] = stdout_map
     if STDOUT_KEY in st.session_state:
         page_data["lab_stdout"] = str(st.session_state[STDOUT_KEY])
+    raw_lab = page_data.get("code")
+    if isinstance(raw_lab, str) and not raw_lab.strip() and not lab_done:
+        page_data["code"] = DEFAULT_LAB_CODE
     save_page_data(PAGE_NAME, page_data)
 
 
@@ -163,9 +203,10 @@ def render_level(progress: DungeonProgress) -> str:
 
     page_data = _load_voice_page_data(google_sub)
     challenge_codes = _challenge_codes_from_state(page_data, progress)
-    _sync_forge_code_session(challenge_codes)
+    _sync_forge_code_session(challenge_codes, progress)
     challenge_stdout = _challenge_stdout_from_state(page_data)
     lab_code = _lab_code_from_state(page_data)
+    _sync_lab_code_session(lab_code, lab_done=lab_done, forge_done=forge_done)
     st.session_state["agent_column_preview"] = {
         "challenge_codes": challenge_codes,
         "lab_code": lab_code,
@@ -228,10 +269,10 @@ def render_level(progress: DungeonProgress) -> str:
                 "你的程式碼（自己完成）",
                 value=lab_code,
                 height=220,
-                key="voice_forge_lab_code",
+                key=LAB_CODE_KEY,
                 disabled=lab_done,
             )
-            page_data["code"] = code
+            page_data["code"] = code if str(code).strip() else DEFAULT_LAB_CODE
 
             if st.button("執行", type="primary", disabled=lab_done, key="forge_run_btn"):
                 result = run_forge_lab_code(code)
@@ -254,23 +295,28 @@ def render_level(progress: DungeonProgress) -> str:
                 st.code(str(preview), language="text")
 
     if lab_done:
-        st.markdown("---")
-        render_mission_complete_banner(
-            message="太棒了！你的 Agent 可以持續陪伴你，隨時等待任務！",
-            next_level_label="Lv.2 Brain",
-            next_level_icon="🧠",
-            next_page=None,
-            button_key="voice_next_level_btn",
-        )
-        try:
-            render_related_python_skills(
-                VOICE_RELATED_SKILLS,
-                button_key="voice_skill_map_btn",
+        with st.container(border=False):
+            st.markdown(
+                '<span class="dungeon-post-complete-band" style="display:none"></span>',
+                unsafe_allow_html=True,
             )
-        except Exception as exc:
-            st.warning(f"延伸技能面板載入失敗：{exc}")
+            st.markdown("---")
+            render_mission_complete_banner(
+                message="太棒了！你的 Agent 可以持續陪伴你，隨時等待任務！",
+                next_level_label="Lv.2 Brain",
+                next_level_icon="🧠",
+                next_page="level_pages/1_Brain.py",
+                button_key="voice_next_level_btn",
+            )
+            try:
+                render_related_python_skills(
+                    VOICE_RELATED_SKILLS,
+                    button_key="voice_skill_map_btn",
+                )
+            except Exception as exc:
+                st.warning(f"延伸技能面板載入失敗：{exc}")
 
-    _persist_voice_page_data(google_sub, page_data)
+    _persist_voice_page_data(google_sub, page_data, progress, lab_done=lab_done)
 
     return build_dungeon_extra_context(
         progress,
