@@ -7,7 +7,7 @@ primary_region = "sin"
 [env]
   STUDIO_CLOUD_MODE = "1"
   PEAS_AGENT_HOME = "/data/peas-agent"
-  PUBLIC_URL = "https://agent-dungeon.fly.dev"
+  PUBLIC_URL = "https://dungeon.vanscoding.com"
 
 [http_service]
   internal_port = 8501
