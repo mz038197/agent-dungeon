@@ -50,7 +50,7 @@ _DUNGEON_INNER_CSS = """
     border: none !important;
   }
 
-  /* 主容器與 header 零上距（三欄貼頂；Streamlit 1.58 stAppHeader） */
+  /* 主容器與 header 零上距（左欄貼頂；Streamlit 1.58 stAppHeader） */
   header.stAppHeader,
   [data-testid="stAppHeader"] {
     display: none !important;
@@ -83,7 +83,7 @@ _DUNGEON_INNER_CSS = """
     padding-top: 0 !important;
   }
 
-  /* Shell 三欄：左貼邊、三欄上貼頂、中欄吃滿釋出空間 */
+  /* Shell 三欄：左貼邊貼頂、中／右欄頂部間隙對齊欄間 gap */
   [data-testid="stElementContainer"]:has(#dungeon-shell-anchor)
     + [data-testid="stLayoutWrapper"] {
     max-width: none !important;
@@ -126,6 +126,22 @@ _DUNGEON_INNER_CSS = """
     color: #0f172a !important;
     border-radius: 12px;
     padding: 0.65rem 0.85rem !important;
+  }
+
+  /* 中／右欄頂部間隙 = 欄間 column-gap；左欄以負 margin 維持貼頂 */
+  .dungeon-shell-layout {
+    padding-top: var(--dungeon-shell-col-gap, 1rem) !important;
+  }
+  .dungeon-col-sidebar {
+    margin-top: calc(-1 * var(--dungeon-shell-col-gap, 1rem)) !important;
+    align-self: stretch !important;
+  }
+  .dungeon-col-center,
+  .dungeon-col-agent {
+    margin-top: 0 !important;
+  }
+  .dungeon-shell-row {
+    align-items: flex-start !important;
   }
 
   /* Main 垂直區塊：消除 shell 與 footer 之間 Streamlit 預設 16px gap */
@@ -814,6 +830,37 @@ _LIGHT_COLUMN_PAINT = """
     return cols.length >= 3 ? cols : null;
   }
 
+  function applyShellColumnTopGap(row, layoutWrapper, cols) {
+    if (!row || !layoutWrapper || !cols || cols.length < 3) {
+      return;
+    }
+    const gap = getComputedStyle(row).columnGap || getComputedStyle(row).gap;
+    if (!gap || gap === "normal" || gap === "0px") {
+      return;
+    }
+    row.style.setProperty("--dungeon-shell-col-gap", gap);
+    layoutWrapper.style.setProperty("--dungeon-shell-col-gap", gap);
+    layoutWrapper.style.paddingTop = gap;
+    cols[0].style.marginTop = `calc(-1 * ${gap})`;
+    cols[1].style.marginTop = "0px";
+    cols[2].style.marginTop = "0px";
+  }
+
+  function stretchSidebarToFooter(doc) {
+    const cols = shellColumns(doc);
+    const footer = footerLayoutWrapper(doc);
+    if (!cols || !footer) {
+      return;
+    }
+    const sidebar = cols[0];
+    const sidebarTop = sidebar.getBoundingClientRect().top;
+    const footerTop = footer.getBoundingClientRect().top;
+    const height = Math.max(0, Math.round(footerTop - sidebarTop));
+    if (height > 0) {
+      sidebar.style.minHeight = `${height}px`;
+    }
+  }
+
   function paintShellColumns() {
     const doc = host.document;
     const cols = shellColumns(doc);
@@ -827,6 +874,7 @@ _LIGHT_COLUMN_PAINT = """
     const layoutWrapper = row?.parentElement;
     row?.classList.add("dungeon-shell-row");
     layoutWrapper?.classList.add("dungeon-shell-layout");
+    applyShellColumnTopGap(row, layoutWrapper, cols);
   }
 
   function shellColumnsRow(doc) {
@@ -1018,6 +1066,7 @@ _LIGHT_COLUMN_PAINT = """
       paintShellColumns();
       columnsPainted = !!shellColumns(host.document);
     }
+    stretchSidebarToFooter(host.document);
     patchMultimodalChatinputIframes(host.document);
     return topOk && bottomOk && columnsPainted;
   }
@@ -1043,6 +1092,7 @@ _LIGHT_COLUMN_PAINT = """
         pending = 0;
         flushShellToTop(host.document);
         flushShellToBottom(host.document);
+        stretchSidebarToFooter(host.document);
       });
     }).observe(mainBlock, { childList: true, subtree: true, attributes: true });
   }
