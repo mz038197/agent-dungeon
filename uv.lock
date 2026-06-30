@@ -1272,8 +1272,8 @@ wheels = [
 
 [[package]]
 name = "peas-agent-core"
-version = "0.5.9"
-source = { git = "https://github.com/mz038197/peas-agent-core.git#f343b96185986694fb61b42758e084e39e14a5ae" }
+version = "0.5.10"
+source = { git = "https://github.com/mz038197/peas-agent-core.git#9d513dce69e39cfffea4117ab0229bb46788f985" }
 dependencies = [
     { name = "croniter" },
     { name = "ddgs" },

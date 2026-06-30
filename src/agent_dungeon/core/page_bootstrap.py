@@ -4,7 +4,7 @@ import streamlit as st
 
 from agent_dungeon.auth.gate import render_login_gate
 from agent_dungeon.auth.session import get_auth_user
-from agent_dungeon.core.bootstrap_config import apply_config_override, bootstrap_shared_config
+from agent_dungeon.core.bootstrap_config import bootstrap_shared_config
 from agent_dungeon.core.cloud_paths import ensure_user_dirs, paths_for_user
 from agent_dungeon.core.env_loader import bootstrap_environment
 
@@ -13,7 +13,6 @@ def init_dungeon_environment() -> None:
     """Load local.env and shared config. Safe before st.set_page_config."""
     bootstrap_environment()
     bootstrap_shared_config()
-    apply_config_override()
 
 
 def require_dungeon_login() -> None:

@@ -284,9 +284,3 @@ def bootstrap_shared_config() -> None:
     _write_json(config_path, merged)
 
     ensure_tts_config_file(shared_tts_config_path())
-
-
-def apply_config_override() -> None:
-    import peas_agent.core as core
-
-    core.CONFIG_PATH_OVERRIDE = shared_config_path()
