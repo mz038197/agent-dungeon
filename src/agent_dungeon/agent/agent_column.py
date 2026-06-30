@@ -12,11 +12,15 @@ def _render_agent_py_preview(
     *,
     challenge_codes: dict[str, str] | None,
     lab_code: str,
+    brain_challenge_codes: dict[str, str] | None = None,
+    brain_lab_code: str = "",
 ) -> None:
     preview = build_agent_py_preview(
         progress,
         challenge_codes=challenge_codes,
         lab_code=lab_code,
+        brain_challenge_codes=brain_challenge_codes,
+        brain_lab_code=brain_lab_code,
     )
     st.markdown("**agent.py（建造中）**")
     st.code(preview, language="python")
@@ -29,10 +33,14 @@ def render_agent_column(
     page_name: str = "",
     challenge_codes: dict[str, str] | None = None,
     lab_code: str = "",
+    brain_challenge_codes: dict[str, str] | None = None,
+    brain_lab_code: str = "",
 ) -> None:
     _render_agent_py_preview(
         progress,
         challenge_codes=challenge_codes,
         lab_code=lab_code,
+        brain_challenge_codes=brain_challenge_codes,
+        brain_lab_code=brain_lab_code,
     )
     render_chat_panel(extra_context=extra_context, page_name=page_name)
