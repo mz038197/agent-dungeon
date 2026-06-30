@@ -37,3 +37,22 @@ def test_build_dungeon_extra_context_includes_left_and_center() -> None:
     assert "【中欄SkillForge_C2】進行中" in extra
     assert "【共享資料檔】" in extra
     assert "voice.json" in extra
+
+
+def test_build_dungeon_extra_context_includes_brain_center() -> None:
+    from agent_dungeon.core.progress import BRAIN_LEVEL_ID, mark_forge_lab_complete
+
+    progress = DungeonProgress()
+    mark_forge_lab_complete(progress)
+    mark_forge_challenge_complete(progress, "c1", level_id=BRAIN_LEVEL_ID)
+    extra = build_dungeon_extra_context(
+        progress,
+        page_name="Brain",
+        google_sub="sub-test",
+        current_module="brain",
+    )
+    assert "【目前頁面】Brain" in extra
+    assert "【中欄SkillForge_C1】完成" in extra
+    assert "【中欄SkillForge_C2】進行中" in extra
+    assert "【中欄Brain模組】Offline" in extra
+    assert "brain.json" in extra

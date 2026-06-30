@@ -2,9 +2,12 @@ from __future__ import annotations
 
 from agent_dungeon.core.cloud_paths import page_data_path, paths_for_user
 from agent_dungeon.core.progress import (
+    BRAIN_LEVEL_ID,
     DungeonProgress,
     ModuleStatus,
+    VOICE_LEVEL_ID,
     agent_level_view,
+    brain_module_online,
     challenge_complete,
     skill_forge_complete,
     voice_module_online,
@@ -49,15 +52,28 @@ def build_left_sidebar_context(
 
 
 def build_voice_forge_context(progress: DungeonProgress) -> dict[str, object]:
-    forge_done = skill_forge_complete(progress)
+    forge_done = skill_forge_complete(progress, level_id=VOICE_LEVEL_ID)
     lab_done = voice_module_online(progress)
     return {
-        "中欄SkillForge_C1": "完成" if challenge_complete(progress, "c1") else "進行中",
-        "中欄SkillForge_C2": "完成" if challenge_complete(progress, "c2") else "進行中",
-        "中欄SkillForge_C3": "完成" if challenge_complete(progress, "c3") else "進行中",
+        "中欄SkillForge_C1": "完成" if challenge_complete(progress, "c1", level_id=VOICE_LEVEL_ID) else "進行中",
+        "中欄SkillForge_C2": "完成" if challenge_complete(progress, "c2", level_id=VOICE_LEVEL_ID) else "進行中",
+        "中欄SkillForge_C3": "完成" if challenge_complete(progress, "c3", level_id=VOICE_LEVEL_ID) else "進行中",
         "中欄SkillForge": "已完成" if forge_done else "進行中",
         "中欄ForgeLab": "已完成" if lab_done else ("已解鎖" if forge_done else "鎖定"),
         "中欄Voice模組": "Online" if lab_done else "Offline",
+    }
+
+
+def build_brain_forge_context(progress: DungeonProgress) -> dict[str, object]:
+    forge_done = skill_forge_complete(progress, level_id=BRAIN_LEVEL_ID)
+    lab_done = brain_module_online(progress)
+    return {
+        "中欄SkillForge_C1": "完成" if challenge_complete(progress, "c1", level_id=BRAIN_LEVEL_ID) else "進行中",
+        "中欄SkillForge_C2": "完成" if challenge_complete(progress, "c2", level_id=BRAIN_LEVEL_ID) else "進行中",
+        "中欄SkillForge_C3": "完成" if challenge_complete(progress, "c3", level_id=BRAIN_LEVEL_ID) else "進行中",
+        "中欄SkillForge": "已完成" if forge_done else "進行中",
+        "中欄ForgeLab": "已完成" if lab_done else ("已解鎖" if forge_done else "鎖定"),
+        "中欄Brain模組": "Online" if lab_done else "Offline",
     }
 
 
@@ -75,6 +91,8 @@ def build_dungeon_extra_context(
     fields.update(build_left_sidebar_context(progress, current_module=current_module))
     if page_name == "Voice":
         fields.update(build_voice_forge_context(progress))
+    elif page_name == "Brain":
+        fields.update(build_brain_forge_context(progress))
     fields.update(page_fields)
     if google_sub is not None:
         shared_path = page_data_path(page_name, paths_for_user(google_sub))
