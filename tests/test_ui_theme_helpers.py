@@ -56,3 +56,30 @@ def test_shell_flush_css_covers_top_and_bottom() -> None:
     assert "margin-top: 0 !important" in dungeon_shell.split("Footer 深藍底")[1]
     assert "border-radius: 0 !important" in dungeon_shell.split("Footer 深藍底")[1]
     assert "stVerticalBlock" in dungeon_shell
+    assert "dungeon-post-complete-band" in dungeon_shell
+
+
+def test_skill_forge_hint_styles_and_no_caption() -> None:
+    repo_root = Path(__file__).resolve().parent.parent
+    pkg_root = repo_root / "src" / "agent_dungeon"
+    dungeon_shell = (pkg_root / "ui" / "dungeon_shell.py").read_text(encoding="utf-8")
+    skill_forge_ui = (pkg_root / "forge" / "skill_forge_ui.py").read_text(encoding="utf-8")
+    shell_ui = (pkg_root / "ui" / "shell_ui.py").read_text(encoding="utf-8")
+
+    from agent_dungeon.forge.challenges import BRAIN_FORGE_CHALLENGES, VOICE_FORGE_CHALLENGES
+
+    assert "skill-forge-summary" in dungeon_shell
+    assert "skill-forge-editor-hint" in dungeon_shell
+    assert "skill-forge-note" in dungeon_shell
+    assert "color: #334155" in dungeon_shell.split("skill-forge-editor-hint")[1]
+    assert "render_skill_forge_summary" in shell_ui
+    assert "render_editor_hint" in shell_ui
+    assert "render_skill_forge_note" in shell_ui
+    assert "st.caption" not in skill_forge_ui
+    assert "render_skill_forge_summary" in skill_forge_ui
+    assert "render_editor_hint" in skill_forge_ui
+    assert "render_skill_forge_note" in skill_forge_ui
+
+    for challenges in (VOICE_FORGE_CHALLENGES, BRAIN_FORGE_CHALLENGES):
+        assert len(challenges) == 3
+        assert all(challenge.editor_hint.strip() for challenge in challenges)

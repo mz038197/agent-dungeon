@@ -448,7 +448,7 @@ _DUNGEON_INNER_CSS = """
     display: flex; align-items: center; justify-content: space-between;
     gap: 1rem; flex-wrap: wrap;
     background: #f5f3ff; border: 1px solid #ddd6fe; border-radius: 12px;
-    padding: 0.75rem 1rem; margin-top: 0.5rem;
+    padding: 0.75rem 1rem; margin-top: 0.5rem; margin-bottom: 0.25rem;
   }
   .skills-panel-copy {
     display: flex; align-items: flex-start; gap: 0.5rem;
@@ -545,9 +545,29 @@ _DUNGEON_INNER_CSS = """
   }
 
   .skill-forge-summary {
-    font-size: 0.88rem;
+    font-size: 0.92rem;
+    font-weight: 600;
     color: #334155;
-    margin: 0.25rem 0 0.5rem;
+    margin: 0 0 0.5rem;
+  }
+  .skill-forge-editor-hint {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-left: 3px solid #6366f1;
+    border-radius: 8px;
+    padding: 0.45rem 0.65rem;
+    font-size: 0.88rem;
+    font-weight: 500;
+    color: #334155;
+    margin: 0.15rem 0 0.55rem;
+    line-height: 1.4;
+  }
+  .skill-forge-note {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #475569;
+    margin: 0.15rem 0 0.35rem;
+    line-height: 1.35;
   }
 
   /* 中欄 */
@@ -568,8 +588,18 @@ _DUNGEON_INNER_CSS = """
     background-color: #f1f5f9 !important;
     border: 1px solid #e2e8f0 !important;
   }
+  .dungeon-col-center [data-testid="stLayoutWrapper"] > [data-testid="stVerticalBlock"]:has(.dungeon-post-complete-band) {
+    background-color: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    margin-bottom: 0.85rem !important;
+    overflow: visible !important;
+  }
   .dungeon-col-center [data-testid="stLayoutWrapper"] > [data-testid="stVerticalBlock"]:has(.skills-panel-bar) {
-    border: 1px solid #c4b5fd !important;
+    background-color: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    overflow: visible !important;
   }
   .dungeon-col-center [data-testid="stAlert"] {
     background-color: #ffffff !important;
@@ -605,8 +635,10 @@ _DUNGEON_INNER_CSS = """
   .dungeon-col-center [data-testid="stMarkdownContainer"] h4 {
     color: #0f172a !important;
   }
-  .dungeon-col-center [data-testid="stCaptionContainer"] {
+  .dungeon-col-center [data-testid="stCaptionContainer"],
+  .dungeon-col-center [data-testid="stCaptionContainer"] p {
     color: #64748b !important;
+    opacity: 1 !important;
   }
 
   /* 右欄 agent.py 預覽 */
@@ -1142,6 +1174,8 @@ def dungeon_shell(
     preview_payload = st.session_state.get("agent_column_preview")
     preview_codes: dict[str, str] = {}
     preview_lab = ""
+    preview_brain_codes: dict[str, str] = {}
+    preview_brain_lab = ""
     if isinstance(preview_payload, dict):
         raw_codes = preview_payload.get("challenge_codes")
         if isinstance(raw_codes, dict):
@@ -1149,6 +1183,12 @@ def dungeon_shell(
         raw_lab = preview_payload.get("lab_code")
         if isinstance(raw_lab, str):
             preview_lab = raw_lab
+        raw_brain_codes = preview_payload.get("brain_challenge_codes")
+        if isinstance(raw_brain_codes, dict):
+            preview_brain_codes = {str(k): str(v) for k, v in raw_brain_codes.items()}
+        raw_brain_lab = preview_payload.get("brain_lab_code")
+        if isinstance(raw_brain_lab, str):
+            preview_brain_lab = raw_brain_lab
 
     with right:
         render_agent_column(
@@ -1157,6 +1197,8 @@ def dungeon_shell(
             page_name=page_name,
             challenge_codes=preview_codes,
             lab_code=preview_lab,
+            brain_challenge_codes=preview_brain_codes,
+            brain_lab_code=preview_brain_lab,
         )
 
     st.markdown('<div id="dungeon-footer-anchor"></div>', unsafe_allow_html=True)

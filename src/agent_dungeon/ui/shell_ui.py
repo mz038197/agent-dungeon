@@ -17,6 +17,7 @@ _PAGE_FILE_PATTERN = re.compile(r"^\d+_.+\.py$")
 
 TITLE_OVERRIDES = {
     "0_Voice": "Voice",
+    "1_Brain": "Brain",
 }
 
 _MULTIMODAL_CHATINPUT_LIGHT_CSS = """
@@ -528,6 +529,27 @@ def render_mission_demo(*, user_text: str, agent_text: str) -> None:
 def render_dungeon_hint(message: str) -> None:
     st.markdown(
         f'<div class="dungeon-hint">{html.escape(message)}</div>',
+        unsafe_allow_html=True,
+    )
+
+
+def render_skill_forge_summary(message: str) -> None:
+    st.markdown(
+        f'<div class="skill-forge-summary">{html.escape(message)}</div>',
+        unsafe_allow_html=True,
+    )
+
+
+def render_editor_hint(message: str) -> None:
+    st.markdown(
+        f'<div class="skill-forge-editor-hint">{html.escape(message)}</div>',
+        unsafe_allow_html=True,
+    )
+
+
+def render_skill_forge_note(message: str) -> None:
+    st.markdown(
+        f'<div class="skill-forge-note">{html.escape(message)}</div>',
         unsafe_allow_html=True,
     )
 
