@@ -9,7 +9,7 @@ import streamlit as st
 
 from agent_dungeon.auth.session import clear_auth, get_auth_user
 from agent_dungeon.core.cloud_paths import APP_ROOT
-from agent_dungeon.core.progress import DungeonProgress, ModuleStatus, agent_level_view, load_user_progress
+from agent_dungeon.core.progress import DungeonProgress, ModuleStatus, agent_level_view, is_dungeon_graduated, load_user_progress
 from agent_dungeon.ui.shell_ui import dungeon_file_page, navigation_page_path, overview_page
 
 ModuleId = Literal[
@@ -109,6 +109,42 @@ def render_left_sidebar(*, current_module: ModuleId | None, progress: DungeonPro
             st.switch_page(overview_page())
 
     _render_progress_card(progress)
+
+    user = get_auth_user(st.session_state)
+    if is_dungeon_graduated(progress) and user is not None:
+        from agent_dungeon.forge.graduation_export import (
+            build_graduation_zip,
+            graduation_zip_filename,
+        )
+
+        progress_sig = tuple(
+            (module_id, progress.modules.get(module_id, ModuleStatus.LOCKED).value)
+            for module_id in sorted(progress.modules)
+        )
+        cache_key = f"graduation_zip_{user.google_sub}"
+        if st.session_state.get(f"{cache_key}_sig") != progress_sig:
+            st.session_state.pop(cache_key, None)
+            st.session_state[f"{cache_key}_sig"] = progress_sig
+
+        if cache_key not in st.session_state:
+            st.session_state[cache_key] = build_graduation_zip(
+                google_sub=user.google_sub,
+                progress=progress,
+                display_name=user.name,
+            )
+
+        st.download_button(
+            "🎓 下載我的 Agent 專案",
+            data=st.session_state[cache_key],
+            file_name=graduation_zip_filename(
+                display_name=user.name,
+                google_sub=user.google_sub,
+            ),
+            mime="application/zip",
+            use_container_width=True,
+            key="download_graduation_zip",
+        )
+        st.caption("八關全通！下載後可本機 `python agent.py` 驗證。")
 
     st.markdown("#### 模組 (Modules)")
     for index, item in enumerate(_module_items(progress)):

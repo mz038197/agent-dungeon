@@ -451,3 +451,10 @@ def loop_module_online(progress: DungeonProgress) -> bool:
     if level is None:
         return False
     return level.forge_lab_complete or progress.modules.get("loop") == ModuleStatus.COMPLETE
+
+
+def is_dungeon_graduated(progress: DungeonProgress) -> bool:
+    return all(
+        progress.modules.get(module_id) == ModuleStatus.COMPLETE
+        for module_id in MODULE_IDS
+    )
