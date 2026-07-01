@@ -18,7 +18,6 @@ _bootstrap_pkg_path()
 
 import streamlit as st
 
-from agent_dungeon.agent.agent_panel import append_assistant_message
 from agent_dungeon.auth.session import get_auth_user
 from agent_dungeon.core.dungeon_context import build_dungeon_extra_context
 from agent_dungeon.core.page_bootstrap import init_dungeon_environment, require_dungeon_login
@@ -281,7 +280,6 @@ def render_level(progress: DungeonProgress) -> str:
                         mark_forge_lab_complete(progress)
                         save_user_progress(google_sub, progress)
                     st.session_state[STDOUT_KEY] = result.stdout.strip()
-                    append_assistant_message(result.stdout.strip())
                     st.success("Forge Lab 通過！Voice 模組已上線。")
                     st.rerun()
                 else:
