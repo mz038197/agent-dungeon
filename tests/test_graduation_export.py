@@ -50,7 +50,8 @@ def test_rewrite_agent_py_header() -> None:
     rewritten = rewrite_agent_py_header(source, progress=progress)
     assert rewritten.startswith('"""Agent Dungeon — 你的 Agent（agent.py）"""\nfrom runtime import Brain')
     assert "agent_dungeon.forge.agent_runtime" not in rewritten
-    assert "# === Voice 模組 ===" in rewritten
+    assert "def main():" in rewritten
+    assert "# === Voice 模組 ===" not in rewritten
 
 
 def test_export_runtime_modules_includes_brain() -> None:

@@ -6,10 +6,12 @@ import pytest
 
 from agent_dungeon.core.progress import DungeonProgress
 from agent_dungeon.forge.agent_py_store import (
+    agent_py_has_module_markers,
     agent_py_path,
     build_agent_py_from_main,
     extract_agent_main_source,
     read_agent_py,
+    rewrite_agent_py_without_module_markers,
     sync_voice_forge_challenge_to_agent_py,
 )
 from agent_dungeon.forge.challenges import voice_forge_lab_seed_code
@@ -70,6 +72,7 @@ def test_sync_voice_forge_writes_c1_to_agent_py(monkeypatch: pytest.MonkeyPatch,
     main = extract_agent_main_source(source)
     assert 'print("Hello")' in main
     assert source.count('if __name__ == "__main__":') == 1
+    assert "# === Voice 模組 ===" not in source
 
 
 def test_voice_lab_code_not_used_for_agent_py_main() -> None:
@@ -91,3 +94,50 @@ if __name__ == "__main__":
     assert "Practice line two." not in c3_main
     assert 'print("Hello")' in c3_main
     assert "Practice line two." in lab_main
+
+
+def test_rewrite_agent_py_without_module_markers(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    google_sub = "test-rewrite-markers"
+    progress = DungeonProgress()
+
+    def fake_paths_for_user(sub: str):
+        from agent_dungeon.core.cloud_paths import UserPaths
+
+        root = tmp_path / sub
+        workspace = root / "workspace"
+        workspace.mkdir(parents=True, exist_ok=True)
+        return UserPaths(
+            google_sub=sub,
+            root=root,
+            profile=root / "profile.json",
+            progress=root / "progress.json",
+            workspace=workspace,
+            agent_py=workspace / "agent.py",
+            sessions=workspace / "sessions",
+            page_data=root / "page_data",
+            chat_images=workspace / "uploads" / "chat_images",
+            tts=root / "tts.json",
+            preferences=root / "preferences.json",
+            effective_config=root / "effective_config.json",
+        )
+
+    monkeypatch.setattr(
+        "agent_dungeon.forge.agent_py_store.paths_for_user",
+        fake_paths_for_user,
+    )
+
+    legacy = build_agent_py_from_main('def main():\n    print("Hello")')
+    legacy = legacy.replace(
+        'def main():',
+        "# === Voice 模組 ===\n# --- Voice ---\n# === /Voice 模組 ===\n\ndef main():",
+        1,
+    )
+    path = agent_py_path(google_sub)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(legacy, encoding="utf-8")
+    assert agent_py_has_module_markers(legacy)
+
+    rewrite_agent_py_without_module_markers(google_sub, progress=progress)
+    cleaned = read_agent_py(path)
+    assert "# === Voice 模組 ===" not in cleaned
+    assert 'print("Hello")' in cleaned

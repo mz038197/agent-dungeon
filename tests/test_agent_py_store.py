@@ -39,3 +39,11 @@ def test_build_agent_py_has_single_main_guard() -> None:
     content = build_agent_py_from_main(polluted)
     assert content.count('if __name__ == "__main__":') == 1
     assert "    if __name__" not in content
+
+
+def test_build_agent_py_omits_module_markers() -> None:
+    content = build_agent_py_from_main('def main():\n    print("Hello")')
+    assert "# === Voice 模組 ===" not in content
+    assert "# === Brain 模組 ===" not in content
+    assert "# === Loop 模組 ===" not in content
+    assert 'print("Hello")' in content

@@ -31,9 +31,7 @@ _MODULE_MARKERS: dict[ModuleName, tuple[str, str]] = {
     "loop": (_LOOP_START, _LOOP_END),
 }
 
-_CHAPTER_VOICE = "# --- Voice ---"
-_CHAPTER_BRAIN = "# --- Brain ---"
-_CHAPTER_LOOP = "# --- Loop ---"
+_MODULE_MARKER_STARTS = (_VOICE_START, _BRAIN_START, _LOOP_START)
 
 _MAIN_ENTRY = '''if __name__ == "__main__":
     main()
@@ -150,25 +148,15 @@ def read_agent_main_body(google_sub: str | None, *, progress: DungeonProgress | 
     return normalize_to_main_function(extract_agent_main_source(read_agent_py(path)))
 
 
-def _marker_lines() -> str:
-    return (
-        f"{_VOICE_START}\n"
-        f"{_CHAPTER_VOICE}\n"
-        f"{_VOICE_END}\n\n"
-        f"{_BRAIN_START}\n"
-        f"{_CHAPTER_BRAIN}\n"
-        f"{_BRAIN_END}\n\n"
-        f"{_LOOP_START}\n"
-        f"{_CHAPTER_LOOP}\n"
-        f"{_LOOP_END}"
-    )
+def agent_py_has_module_markers(source: str) -> bool:
+    return any(marker in source for marker in _MODULE_MARKER_STARTS)
 
 
 def build_agent_py_from_main(main_source: str, *, progress: DungeonProgress | None = None) -> str:
     progress = progress or DungeonProgress()
     header = build_platform_header(progress=progress).strip()
     main_fn = normalize_to_main_function(main_source)
-    return f"{header}\n\n{_marker_lines()}\n\n{main_fn}\n\n{_MAIN_ENTRY.strip()}\n"
+    return f"{header}\n\n{main_fn}\n\n{_MAIN_ENTRY.strip()}\n"
 
 
 def build_agent_py_template(*, progress: DungeonProgress | None = None) -> str:
@@ -220,6 +208,21 @@ def backfill_voice_forge_to_agent_py(
     if not code.strip():
         return None
     return sync_voice_forge_challenge_to_agent_py(google_sub, code, progress=progress)
+
+
+def rewrite_agent_py_without_module_markers(
+    google_sub: str,
+    *,
+    progress: DungeonProgress,
+) -> Path | None:
+    path = agent_py_path(google_sub)
+    if not path.is_file():
+        return None
+    source = read_agent_py(path)
+    if not agent_py_has_module_markers(source):
+        return None
+    main_body = extract_agent_main_source(source)
+    return write_agent_main_body(google_sub, main_body, progress=progress)
 
 
 def write_agent_main_body(

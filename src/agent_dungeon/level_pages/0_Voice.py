@@ -272,8 +272,12 @@ def render_level(progress: DungeonProgress) -> str:
     challenge_codes = _challenge_codes_from_state(page_data, progress)
     _sync_forge_code_session(challenge_codes, progress)
     if google_sub is not None:
-        from agent_dungeon.forge.agent_py_store import backfill_voice_forge_to_agent_py
+        from agent_dungeon.forge.agent_py_store import (
+            backfill_voice_forge_to_agent_py,
+            rewrite_agent_py_without_module_markers,
+        )
 
+        rewrite_agent_py_without_module_markers(google_sub, progress=progress)
         backfill_voice_forge_to_agent_py(google_sub, challenge_codes, progress=progress)
     challenge_stdout = _challenge_stdout_from_state(page_data)
     lab_code = _lab_code_from_state(

@@ -11,8 +11,8 @@ from agent_dungeon.core.progress import (
 def test_preview_locked_before_forge() -> None:
     preview = build_agent_py_preview(DungeonProgress())
     assert "# agent.py — 建造中" in preview
-    assert "# 🔒 完成 Skill Forge 解鎖" in preview
-    assert "# 🔒 尚未解鎖" in preview
+    assert "# === Voice 模組 ===" not in preview
+    assert "# 🔒" not in preview
     assert "def main():" in preview
 
 
@@ -24,7 +24,7 @@ def test_preview_grows_with_c1() -> None:
         challenge_codes={"c1": 'print("Hello")'},
     )
     assert 'print("Hello")' in preview
-    assert "# 🔒 完成 Skill Forge 解鎖" not in preview
+    assert "# === Voice 模組 ===" not in preview
 
 
 def test_preview_uses_c3_not_lab_code_when_voice_online() -> None:

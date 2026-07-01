@@ -3,12 +3,9 @@ from __future__ import annotations
 from pathlib import Path
 
 from agent_dungeon.core.progress import (
-    BRAIN_LEVEL_ID,
-    LOOP_LEVEL_ID,
     DungeonProgress,
     ModuleStatus,
     brain_module_online,
-    challenge_complete,
     voice_module_online,
 )
 from agent_dungeon.forge.agent_py_store import normalize_to_main_function
@@ -19,13 +16,6 @@ from agent_dungeon.forge.challenges import (
 )
 
 _PREVIEW_HEADER = "# agent.py — 建造中"
-_VOICE_SECTION = "# === Voice 模組 ==="
-_BRAIN_SECTION = "# === Brain 模組 ==="
-_LOOP_SECTION = "# === Loop 模組 ==="
-_VOICE_LOCKED = "# 🔒 完成 Skill Forge 解鎖"
-_BRAIN_LOCKED = "# 🔒 尚未解鎖"
-_BRAIN_FORGE_LOCKED = "# 🔒 完成 Skill Forge 解鎖"
-_LOOP_LOCKED = "# 🔒 完成 Brain 後解鎖"
 
 
 def _normalize_preview_main(body: str) -> str:
@@ -117,39 +107,9 @@ def build_agent_py_preview(
         )
     )
 
-    voice_marker = _VOICE_SECTION if voice_module_online(progress) or any(
-        challenge_complete(progress, cid) for cid in ("c1", "c2", "c3")
-    ) else f"{_VOICE_SECTION}\n{_VOICE_LOCKED}"
-
-    if progress.modules.get("voice") != ModuleStatus.COMPLETE:
-        brain_marker = f"{_BRAIN_SECTION}\n{_BRAIN_LOCKED}"
-    elif brain_module_online(progress) or any(
-        challenge_complete(progress, cid, level_id=BRAIN_LEVEL_ID) for cid in ("c1", "c2", "c3")
-    ):
-        brain_marker = _BRAIN_SECTION
-    else:
-        brain_marker = f"{_BRAIN_SECTION}\n{_BRAIN_FORGE_LOCKED}"
-
-    if progress.modules.get("brain") != ModuleStatus.COMPLETE:
-        loop_marker = f"{_LOOP_SECTION}\n{_LOOP_LOCKED}"
-    else:
-        loop_marker = _LOOP_SECTION
-
     return "\n".join(
         [
             _PREVIEW_HEADER,
-            "",
-            voice_marker,
-            "# --- Voice ---",
-            "# === /Voice 模組 ===",
-            "",
-            brain_marker,
-            "# --- Brain ---",
-            "# === /Brain 模組 ===",
-            "",
-            loop_marker,
-            "# --- Loop ---",
-            "# === /Loop 模組 ===",
             "",
             main_body,
             "",
