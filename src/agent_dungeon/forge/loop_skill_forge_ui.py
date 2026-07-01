@@ -19,6 +19,7 @@ from agent_dungeon.forge.forge_terminal_ui import render_agent_terminal
 from agent_dungeon.forge.loop_validator import validate_loop_challenge
 from agent_dungeon.forge.skill_forge_ui import (
     COLLAPSE_BUTTON_LABEL,
+    SkillForgeConfig,
     _challenge_unlocked,
     _editor_key,
     _forge_progress,
@@ -33,17 +34,14 @@ from agent_dungeon.ui.shell_ui import render_editor_hint, render_skill_forge_not
 
 LOOP_FORGE_CONFIG_PREFIX = "loop_forge"
 
-
-def _config_like(challenges=LOOP_FORGE_CHALLENGES):
-    class _Cfg:
-        level_id = LOOP_LEVEL_ID
-        key_prefix = LOOP_FORGE_CONFIG_PREFIX
-        challenges = challenges
-        caption = "跟著老師，替 Agent 裝上 Conversation Loop！"
-        reward_ready = "Loop 技能已就緒"
-        reward_pending = "完成三關 Skill Forge 後顯示獎勵"
-
-    return _Cfg()
+LOOP_FORGE_CONFIG = SkillForgeConfig(
+    level_id=LOOP_LEVEL_ID,
+    key_prefix=LOOP_FORGE_CONFIG_PREFIX,
+    challenges=LOOP_FORGE_CHALLENGES,
+    caption="跟著老師，替 Agent 裝上 Conversation Loop！",
+    reward_ready="Loop 技能已就緒",
+    reward_pending="完成四關 Skill Forge 後顯示獎勵",
+)
 
 
 def _sync_loop_to_agent_py(
@@ -65,7 +63,7 @@ def _render_loop_challenge_card(
     code: str,
     on_sync: Callable[[str, str], None],
 ) -> None:
-    config = _config_like()
+    config = LOOP_FORGE_CONFIG
     done = challenge_complete(progress, challenge.id, level_id=LOOP_LEVEL_ID)
     editor_key = _editor_key(config, challenge.id)
 
@@ -129,7 +127,13 @@ def _render_loop_challenge_card(
             if is_awaiting_collapse(config, challenge.id):
                 _render_collapse_button(config=config, challenge_id=challenge.id)
         else:
-            render_skill_forge_note("請在終端機啟動 Agent、至少聊 2 輪，再按確認過關。")
+            if challenge.id == "c2":
+                hint = "請在終端機至少聊 2 輪（不含 bye），再按確認過關。"
+            elif challenge.id == "c4":
+                hint = "請在終端機至少完成 1 輪有效對話，再按確認過關。"
+            else:
+                hint = "確認程式碼結構正確後，按確認過關。"
+            render_skill_forge_note(hint)
 
 
 def render_loop_skill_forge(
@@ -140,7 +144,7 @@ def render_loop_skill_forge(
     challenge_codes: dict[str, str],
     on_sync: Callable[[str, str], None],
 ) -> bool:
-    config = _config_like()
+    config = LOOP_FORGE_CONFIG
 
     with st.container(border=True):
         st.markdown(

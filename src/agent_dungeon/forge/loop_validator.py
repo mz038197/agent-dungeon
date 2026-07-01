@@ -4,7 +4,7 @@ import ast
 from dataclasses import dataclass
 from pathlib import Path
 
-from agent_dungeon.forge.agent_py_store import get_module_section, read_agent_py
+from agent_dungeon.forge.agent_py_store import extract_agent_main_source, read_agent_py
 from agent_dungeon.forge.agent_terminal import AgentTerminalSession
 
 
@@ -69,15 +69,46 @@ def _has_invoke(source: str) -> bool:
     return False
 
 
+def _has_bye_bye_print(source: str) -> bool:
+    tree = _parse(source)
+    if tree is None:
+        return False
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        if not isinstance(func, ast.Name) or func.id != "print":
+            continue
+        if not node.args:
+            continue
+        arg = node.args[0]
+        if isinstance(arg, ast.Constant) and arg.value == "bye bye!":
+            return True
+    return False
+
+
+def _has_empty_string_continue(source: str) -> bool:
+    tree = _parse(source)
+    if tree is None:
+        return False
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.If):
+            continue
+        test = node.test
+        if isinstance(test, ast.UnaryOp) and isinstance(test.op, ast.Not):
+            operand = test.operand
+            if isinstance(operand, ast.Call):
+                func = operand.func
+                if isinstance(func, ast.Attribute) and func.attr == "strip":
+                    for stmt in node.body:
+                        if isinstance(stmt, ast.Continue):
+                            return True
+    return False
+
+
 def _loop_source_from_agent_py(agent_py: Path) -> str:
     full = read_agent_py(agent_py)
-    loop = get_module_section(full, "loop")
-    brain = get_module_section(full, "brain")
-    if loop and not loop.startswith("# 🔒"):
-        return loop
-    if brain and not brain.startswith("# 🔒"):
-        return brain
-    return full
+    return extract_agent_main_source(full)
 
 
 def validate_loop_challenge(
@@ -89,13 +120,23 @@ def validate_loop_challenge(
 ) -> LoopValidationResult:
     source = _loop_source_from_agent_py(agent_py)
     if not source.strip():
-        return LoopValidationResult(ok=False, error="agent.py Loop 區塊為空。")
+        return LoopValidationResult(ok=False, error="agent.py main() 為空。")
 
     if challenge_id == "c1":
         if not _has_while_loop(source):
             return LoopValidationResult(ok=False, error="需要 while 迴圈。")
+        if not _has_input_in_while(source):
+            return LoopValidationResult(ok=False, error="input() 需在 while 迴圈內。")
+        return LoopValidationResult(ok=True)
+
+    if challenge_id == "c2":
         if not _has_break(source):
             return LoopValidationResult(ok=False, error="需要 break 離開方式（例如 bye）。")
+        if not _has_bye_bye_print(source):
+            return LoopValidationResult(
+                ok=False,
+                error='bye 時需要 print("bye bye!")。',
+            )
         if session is not None and session.turn_count < min_turns:
             return LoopValidationResult(
                 ok=False,
@@ -103,21 +144,19 @@ def validate_loop_challenge(
             )
         return LoopValidationResult(ok=True)
 
-    if challenge_id == "c2":
-        if not _has_input_in_while(source):
-            return LoopValidationResult(ok=False, error="input() 需在 while 迴圈內。")
-        if not _has_invoke(source):
-            return LoopValidationResult(ok=False, error="需要 llm.invoke(...)。")
-        if session is not None and session.turn_count < min_turns:
-            return LoopValidationResult(
-                ok=False,
-                error=f"請在終端機至少對話 {min_turns} 輪，目前 {session.turn_count} 輪。",
-            )
-        return LoopValidationResult(ok=True)
-
     if challenge_id == "c3":
         if not _has_continue(source):
             return LoopValidationResult(ok=False, error="需要 continue（例如空字串跳過）。")
+        if not _has_empty_string_continue(source):
+            return LoopValidationResult(
+                ok=False,
+                error="需要檢查空字串（例如 if not question.strip(): continue）。",
+            )
+        return LoopValidationResult(ok=True)
+
+    if challenge_id == "c4":
+        if not _has_invoke(source):
+            return LoopValidationResult(ok=False, error="需要 llm.invoke(...)。")
         if session is not None and session.turn_count < 1:
             return LoopValidationResult(ok=False, error="請在終端機至少完成一輪有效對話。")
         return LoopValidationResult(ok=True)

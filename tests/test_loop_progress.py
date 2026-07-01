@@ -16,7 +16,7 @@ from agent_dungeon.core.progress import (
 )
 from agent_dungeon.forge.agent_py_store import (
     ensure_agent_py,
-    get_module_section,
+    extract_agent_main_source,
     read_agent_py,
     write_loop_module_body,
     write_module_section,
@@ -56,7 +56,7 @@ def test_loop_lab_complete_unlocks_identity(peas_home) -> None:
     progress = load_user_progress("sub-loop2")
     _complete_voice(progress)
     mark_brain_forge_lab_complete(progress)
-    for cid in ("c1", "c2", "c3"):
+    for cid in ("c1", "c2", "c3", "c4"):
         mark_forge_challenge_complete(progress, cid, level_id=LOOP_LEVEL_ID)
     mark_loop_forge_lab_complete(progress)
     save_user_progress("sub-loop2", progress)
@@ -67,24 +67,32 @@ def test_loop_lab_complete_unlocks_identity(peas_home) -> None:
     assert agent_level(reloaded) == 3
 
 
-def test_agent_py_store_sections(peas_home) -> None:
+def test_agent_py_store_writes_unified_main(peas_home) -> None:
     progress = load_user_progress("sub-store")
     path = ensure_agent_py("sub-store", progress=progress)
-    write_module_section("sub-store", "voice", 'print("hi")', progress=progress)
+    write_module_section(
+        "sub-store",
+        "voice",
+        'def main():\n    print("hi")',
+        progress=progress,
+    )
     text = read_agent_py(path)
-    assert get_module_section(text, "voice") == 'print("hi")'
+    main = extract_agent_main_source(text)
+    assert 'print("hi")' in main
+    assert "def main()" in main
 
 
 def test_loop_validator_c1(peas_home) -> None:
     progress = load_user_progress("sub-v")
     _complete_voice(progress)
     mark_brain_forge_lab_complete(progress)
-    body = '''while True:
-    question = input("> ")
-    if question == "bye":
-        break
-    print(question)
-'''
+    body = """def main():
+    llm = Brain(model="gpt-4.1-mini")
+    while True:
+        question = input("> ")
+        if question == "bye":
+            break
+"""
     path = write_loop_module_body("sub-v", body, progress=progress)
     result = validate_loop_challenge("c1", path)
     assert result.ok is True
