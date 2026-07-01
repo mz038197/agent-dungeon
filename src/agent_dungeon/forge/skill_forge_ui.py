@@ -6,6 +6,7 @@ from dataclasses import dataclass
 import streamlit as st
 
 from agent_dungeon.forge.challenges import BRAIN_FORGE_CHALLENGES, ForgeChallenge, VOICE_FORGE_CHALLENGES
+from agent_dungeon.forge.code_checks import has_input_call
 from agent_dungeon.ui.shell_ui import (
     render_editor_hint,
     render_skill_forge_note,
@@ -18,11 +19,12 @@ from agent_dungeon.core.progress import (
     DungeonProgress,
     VOICE_LEVEL_ID,
     challenge_complete,
-    forge_challenge_ids_for_level,
     mark_forge_challenge_complete,
     save_user_progress,
     skill_forge_complete,
 )
+
+COLLAPSE_BUTTON_LABEL = "確認結果，收合此關"
 
 
 @dataclass(frozen=True)
@@ -35,6 +37,7 @@ class SkillForgeConfig:
     reward_pending: str
     stdin_label: str = ""
     run_challenge: Callable[..., ForgeRunResult] | None = None
+    on_challenge_complete: Callable[[str, str], None] | None = None
 
 
 VOICE_FORGE_CONFIG = SkillForgeConfig(
@@ -56,6 +59,74 @@ BRAIN_FORGE_CONFIG = SkillForgeConfig(
     stdin_label="執行時 input() 會讀這裡的值",
     run_challenge=run_brain_forge_challenge,
 )
+
+
+def _brain_review_code(
+    challenge: ForgeChallenge,
+    challenge_codes: dict[str, str],
+    session_code: str,
+) -> str:
+    stored = challenge_codes.get(challenge.id, challenge.default_code)
+    session = session_code.strip()
+    stored_text = str(stored).strip()
+    for candidate in (session, stored_text):
+        if candidate and has_input_call(candidate):
+            return candidate
+    if session:
+        return session
+    if stored_text:
+        return stored_text
+    return challenge.default_code
+
+
+def review_code_for_completed(
+    challenge: ForgeChallenge,
+    challenge_codes: dict[str, str],
+    session_code: str,
+    *,
+    level_id: str = VOICE_LEVEL_ID,
+) -> str:
+    """Prefer live editor content; fall back to persisted or default hint."""
+    if level_id == BRAIN_LEVEL_ID:
+        return _brain_review_code(challenge, challenge_codes, session_code)
+    if session_code.strip():
+        return session_code.strip()
+    return challenge_codes.get(challenge.id, challenge.default_code)
+
+
+def _awaiting_collapse_key(config: SkillForgeConfig, challenge_id: str) -> str:
+    return f"{config.key_prefix}_{challenge_id}_awaiting_collapse"
+
+
+def is_awaiting_collapse(config: SkillForgeConfig, challenge_id: str) -> bool:
+    return bool(st.session_state.get(_awaiting_collapse_key(config, challenge_id), False))
+
+
+def _set_awaiting_collapse(config: SkillForgeConfig, challenge_id: str, *, awaiting: bool) -> None:
+    key = _awaiting_collapse_key(config, challenge_id)
+    if awaiting:
+        st.session_state[key] = True
+    else:
+        st.session_state.pop(key, None)
+
+
+def _editor_key(config: SkillForgeConfig, challenge_id: str) -> str:
+    return f"{config.key_prefix}_{challenge_id}_code"
+
+
+def _stdout_key(config: SkillForgeConfig, challenge_id: str) -> str:
+    return f"{config.key_prefix}_{challenge_id}_stdout"
+
+
+def _render_collapse_button(*, config: SkillForgeConfig, challenge_id: str) -> None:
+    collapse_key = f"{config.key_prefix}_{challenge_id}_collapse"
+    if st.button(
+        COLLAPSE_BUTTON_LABEL,
+        key=collapse_key,
+        use_container_width=True,
+        type="secondary",
+    ):
+        _set_awaiting_collapse(config, challenge_id, awaiting=False)
 
 
 def _challenge_unlocked(
@@ -101,19 +172,19 @@ def _render_challenge_card(
         st.markdown(f"**{challenge.label}** — {challenge.title}")
         hint = challenge.editor_hint.strip() or challenge.title
         render_editor_hint(f"💡 {hint}")
-        if config.level_id == BRAIN_LEVEL_ID and config.stdin_label:
-            st.text_input(
-                config.stdin_label,
-                key=f"{config.key_prefix}_stdin",
-                disabled=done,
-            )
-            stdin_value = str(st.session_state.get(f"{config.key_prefix}_stdin", stdin_value))
 
-        editor_key = f"{config.key_prefix}_{challenge.id}_code"
+        editor_key = _editor_key(config, challenge.id)
         run_key = f"{config.key_prefix}_{challenge.id}_run"
-        stdout_key = f"{config.key_prefix}_{challenge.id}_stdout"
+        stdout_key = _stdout_key(config, challenge.id)
 
-        if editor_key not in st.session_state:
+        if (
+            not done
+            and config.level_id == BRAIN_LEVEL_ID
+            and has_input_call(code)
+            and not has_input_call(str(st.session_state.get(editor_key, "")))
+        ):
+            st.session_state[editor_key] = code
+        elif editor_key not in st.session_state:
             st.session_state[editor_key] = code
         elif not done and not str(st.session_state.get(editor_key, "")).strip():
             st.session_state[editor_key] = code
@@ -131,10 +202,9 @@ def _render_challenge_card(
                 "可選 model：`ollama_cloud@minimax-m3:cloud`、`openai@gpt-4o-mini`"
             )
 
-        if st.button(
+        if not done and st.button(
             "▶ 執行",
             key=run_key,
-            disabled=done,
             use_container_width=True,
             type="primary",
         ):
@@ -149,6 +219,8 @@ def _render_challenge_card(
                 result = run_forge_challenge(challenge.id, edited)
             st.session_state[stdout_key] = result.stdout
             if result.ok:
+                if config.on_challenge_complete is not None:
+                    config.on_challenge_complete(challenge.id, edited)
                 if google_sub is not None:
                     mark_forge_challenge_complete(
                         progress,
@@ -156,27 +228,62 @@ def _render_challenge_card(
                         level_id=config.level_id,
                     )
                     save_user_progress(google_sub, progress)
+                _set_awaiting_collapse(config, challenge.id, awaiting=True)
                 st.rerun()
             else:
                 st.error(result.error or "執行失敗")
 
+        is_done = challenge_complete(progress, challenge.id, level_id=config.level_id)
         display_stdout = st.session_state.get(stdout_key, stdout)
-        if display_stdout.strip() or done:
+        if display_stdout.strip() or is_done:
             st.markdown("**▶ 執行結果**")
             st.code(display_stdout.strip() or "（無輸出）", language="text")
 
-        if done:
+        if is_done:
             st.success("✅ 完成！")
+            if is_awaiting_collapse(config, challenge.id):
+                _render_collapse_button(config=config, challenge_id=challenge.id)
         else:
             render_skill_forge_note("進行中…")
 
 
+def _render_awaiting_collapse(
+    *,
+    config: SkillForgeConfig,
+    challenge: ForgeChallenge,
+    challenge_stdout: dict[str, str],
+) -> None:
+    editor_key = _editor_key(config, challenge.id)
+    stdout_key = _stdout_key(config, challenge.id)
+    code = str(st.session_state.get(editor_key, ""))
+
+    with st.container(border=True):
+        st.markdown(f"**{challenge.label}** — {challenge.title}")
+
+        st.code(code or "（無程式碼）", language="python")
+
+        display_stdout = str(
+            st.session_state.get(stdout_key, challenge_stdout.get(challenge.id, ""))
+        )
+        st.markdown("**▶ 執行結果**")
+        st.code(display_stdout.strip() or "（無輸出）", language="text")
+        st.success("✅ 完成！")
+        _render_collapse_button(config=config, challenge_id=challenge.id)
+
+
 def _render_completed_challenge(
     *,
+    config: SkillForgeConfig,
     challenge: ForgeChallenge,
     challenge_codes: dict[str, str],
 ) -> None:
-    review_code = challenge_codes.get(challenge.id, challenge.default_code)
+    session_code = str(st.session_state.get(_editor_key(config, challenge.id), ""))
+    review_code = review_code_for_completed(
+        challenge,
+        challenge_codes,
+        session_code,
+        level_id=config.level_id,
+    )
     st.markdown(f"✅ **{challenge.label}** — {challenge.title}")
     with st.expander("查看程式碼"):
         st.code(review_code, language="python")
@@ -229,6 +336,13 @@ def render_skill_forge(
         )
         st.markdown(f"**進度：{done_count} / {total}**")
 
+        if config.stdin_label and not forge_complete:
+            st.text_input(
+                config.stdin_label,
+                key=f"{config.key_prefix}_stdin",
+            )
+            stdin_value = str(st.session_state.get(f"{config.key_prefix}_stdin", stdin_value))
+
         for challenge in challenges:
             done = challenge_complete(progress, challenge.id, level_id=config.level_id)
             unlocked = _challenge_unlocked(
@@ -238,8 +352,15 @@ def render_skill_forge(
                 challenges=challenges,
             )
 
-            if done:
+            if done and is_awaiting_collapse(config, challenge.id):
+                _render_awaiting_collapse(
+                    config=config,
+                    challenge=challenge,
+                    challenge_stdout=challenge_stdout,
+                )
+            elif done:
                 _render_completed_challenge(
+                    config=config,
                     challenge=challenge,
                     challenge_codes=challenge_codes,
                 )
