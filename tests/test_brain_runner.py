@@ -54,8 +54,8 @@ def test_brain_c2_passes() -> None:
 
 def test_brain_c3_passes_with_mock_llm() -> None:
     with patch(
-        "agent_dungeon.forge.llm_provider.invoke_llm_message",
-        return_value="Python 是一種程式語言。",
+        "agent_dungeon.forge.adapters.brain.invoke_llm_response",
+        return_value=("Python 是一種程式語言。", ""),
     ):
         result = run_brain_forge_challenge(
             "c3",
@@ -73,8 +73,8 @@ response = llm.invoke("hi")
 print(response)
 """
     with patch(
-        "agent_dungeon.forge.llm_provider.invoke_llm_message",
-        return_value="ok",
+        "agent_dungeon.forge.adapters.brain.invoke_llm_response",
+        return_value=("ok", ""),
     ):
         result = run_brain_forge_challenge(
             "c3",
@@ -94,8 +94,8 @@ response = llm.invoke(f"{{prompt}}\\n{{question}}")
 print(response)
 """
     with patch(
-        "agent_dungeon.forge.llm_provider.invoke_llm_message",
-        return_value="Hello!",
+        "agent_dungeon.forge.adapters.brain.invoke_llm_response",
+        return_value=("Hello!", ""),
     ):
         result = run_brain_forge_lab_code(
             code,
@@ -115,8 +115,8 @@ response = llm.invoke(f"{prompt}\\n{question}")
 print(response)
 """
     with patch(
-        "agent_dungeon.forge.llm_provider.invoke_llm_message",
-        return_value="1+1=2",
+        "agent_dungeon.forge.adapters.brain.invoke_llm_response",
+        return_value=("1+1=2", ""),
     ):
         result = run_brain_forge_lab_code(
             code,

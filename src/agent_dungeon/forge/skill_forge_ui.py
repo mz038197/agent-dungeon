@@ -89,9 +89,14 @@ def review_code_for_completed(
     """Prefer live editor content; fall back to persisted or default hint."""
     if level_id == BRAIN_LEVEL_ID:
         return _brain_review_code(challenge, challenge_codes, session_code)
-    if session_code.strip():
-        return session_code.strip()
-    return challenge_codes.get(challenge.id, challenge.default_code)
+    stored = str(challenge_codes.get(challenge.id, challenge.default_code)).strip()
+    session = session_code.strip()
+    default = challenge.default_code.strip()
+    if session and session != default:
+        return session
+    if stored:
+        return stored
+    return challenge.default_code
 
 
 def _awaiting_collapse_key(config: SkillForgeConfig, challenge_id: str) -> str:
@@ -221,12 +226,12 @@ def _render_challenge_card(
             if result.ok:
                 if config.on_challenge_complete is not None:
                     config.on_challenge_complete(challenge.id, edited)
+                mark_forge_challenge_complete(
+                    progress,
+                    challenge.id,
+                    level_id=config.level_id,
+                )
                 if google_sub is not None:
-                    mark_forge_challenge_complete(
-                        progress,
-                        challenge.id,
-                        level_id=config.level_id,
-                    )
                     save_user_progress(google_sub, progress)
                 _set_awaiting_collapse(config, challenge.id, awaiting=True)
                 st.rerun()
@@ -286,7 +291,7 @@ def _render_completed_challenge(
     )
     st.markdown(f"✅ **{challenge.label}** — {challenge.title}")
     with st.expander("查看程式碼"):
-        st.code(review_code, language="python")
+        st.code(review_code or "（無程式碼）", language="python")
 
 
 def _render_locked_challenge(challenge: ForgeChallenge) -> None:

@@ -9,6 +9,16 @@ from agent_dungeon.forge.skill_forge_ui import (
 )
 
 
+def test_review_code_prefers_session_over_default_template() -> None:
+    challenge = VOICE_FORGE_CHALLENGES[1]
+    student = 'def main():\n    print("Hello")'
+    codes = {challenge.id: student}
+    assert (
+        review_code_for_completed(challenge, codes, challenge.default_code)
+        == student
+    )
+
+
 def test_review_code_prefers_session_code() -> None:
     challenge = VOICE_FORGE_CHALLENGES[0]
     codes = {challenge.id: challenge.default_code}

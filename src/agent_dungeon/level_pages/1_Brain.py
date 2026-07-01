@@ -45,7 +45,7 @@ from agent_dungeon.forge.challenges import (
     merge_brain_challenge_stored_with_session,
     resolve_stored_lab_code,
 )
-from agent_dungeon.forge.code_checks import has_input_call
+from agent_dungeon.forge.code_checks import has_brain_constructor, has_input_call
 from agent_dungeon.forge.skill_forge_ui import BRAIN_FORGE_CONFIG, render_skill_forge
 from agent_dungeon.ui.dungeon_shell import dungeon_shell
 from agent_dungeon.ui.mission_complete_ui import render_mission_complete_banner
@@ -167,9 +167,16 @@ def _sync_forge_code_session(challenge_codes: dict[str, str], progress: DungeonP
             and has_input_call(expected)
             and not has_input_call(current)
         )
+        missing_brain_constructor = (
+            prev_complete
+            and challenge.id == "c3"
+            and has_brain_constructor(expected)
+            and not has_brain_constructor(current)
+        )
         if (
             unlock_empty
             or missing_prior
+            or missing_brain_constructor
             or forge_editor_code_needs_refresh(
                 challenge,
                 current,

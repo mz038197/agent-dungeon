@@ -206,10 +206,6 @@ def render_level(progress: DungeonProgress) -> str:
     challenge_stdout = _challenge_stdout_from_state(page_data)
     lab_code = _lab_code_from_state(page_data, lab_done=lab_done)
     _sync_lab_code_session(lab_code, lab_done=lab_done, forge_done=forge_done)
-    st.session_state["agent_column_preview"] = {
-        "challenge_codes": challenge_codes,
-        "lab_code": lab_code,
-    }
 
     render_level_heading(1, VOICE_LEVEL_SUBTITLE, tag=quest_tag(VOICE_LEVEL_ID))
 
@@ -236,7 +232,7 @@ def render_level(progress: DungeonProgress) -> str:
             st.markdown("#### ✅ 完成條件")
             st.checkbox("完成 Skill Forge 三關", value=forge_done, disabled=True)
             st.checkbox("Agent 成功輸出至少兩句話", value=lab_done, disabled=True)
-            st.checkbox("定義並呼叫 speak()", value=lab_done, disabled=True)
+            st.checkbox("定義 main() 並輸出至少兩句話", value=lab_done, disabled=True)
 
     render_numbered_section_heading(2, "SKILL FORGE", variant="blue")
     render_skill_forge(
@@ -327,6 +323,21 @@ def render_level(progress: DungeonProgress) -> str:
                 st.warning(f"延伸技能面板載入失敗：{exc}")
 
     _persist_voice_page_data(google_sub, page_data, progress, lab_done=lab_done)
+
+    preview_codes = dict(challenge_codes)
+    stored_challenges = page_data.get("challenges")
+    if isinstance(stored_challenges, dict):
+        preview_codes.update(stored_challenges)
+    for challenge in VOICE_FORGE_CHALLENGES:
+        code_key = f"voice_forge_{challenge.id}_code"
+        if code_key in st.session_state:
+            raw = str(st.session_state[code_key]).strip()
+            if raw:
+                preview_codes[challenge.id] = str(st.session_state[code_key])
+    st.session_state["agent_column_preview"] = {
+        "challenge_codes": preview_codes,
+        "lab_code": lab_code,
+    }
 
     return build_dungeon_extra_context(
         progress,

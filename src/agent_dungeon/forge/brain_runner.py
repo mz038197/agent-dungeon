@@ -5,7 +5,7 @@ import io
 from contextlib import redirect_stdout
 from dataclasses import dataclass
 
-from agent_dungeon.forge.code_checks import has_input_call
+from agent_dungeon.forge.code_checks import has_brain_constructor, has_input_call
 from agent_dungeon.forge.llm_provider import DEFAULT_BRAIN_MODEL, make_brain_class, model_in_allowlist
 
 BRAIN_CHALLENGE_IDS = ("c1", "c2", "c3")
@@ -66,7 +66,7 @@ def _brain_model_from_source(source: str) -> str | None:
 
 
 def _has_brain_constructor(source: str) -> bool:
-    return _brain_model_from_source(source) is not None
+    return has_brain_constructor(source)
 
 
 def _has_invoke_call(source: str) -> bool:

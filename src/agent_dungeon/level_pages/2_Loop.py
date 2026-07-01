@@ -35,9 +35,8 @@ from agent_dungeon.core.progress import (
 from agent_dungeon.forge.agent_py_store import (
     agent_py_path,
     ensure_agent_py,
-    get_module_section,
     migrate_page_data_to_agent_py,
-    read_agent_py,
+    read_agent_main_body,
     read_module_for_editor,
     write_loop_module_body,
 )
@@ -97,9 +96,7 @@ def _load_loop_page_data(google_sub: str | None) -> dict:
 
 def _brain_seed(google_sub: str, progress: DungeonProgress) -> str:
     migrate_page_data_to_agent_py(google_sub, progress=progress)
-    full = read_agent_py(agent_py_path(google_sub))
-    brain = get_module_section(full, "brain")
-    return brain if brain and not brain.startswith("# 🔒") else ""
+    return read_agent_main_body(google_sub, progress=progress)
 
 
 def _challenge_codes_from_state(
@@ -283,7 +280,7 @@ def render_level(progress: DungeonProgress) -> str:
     with m3:
         with st.container(border=True, height=MISSION_CARD_HEIGHT):
             st.markdown("#### ✅ 完成條件")
-            st.checkbox("完成 Skill Forge 三關", value=forge_done, disabled=True)
+            st.checkbox("完成 Skill Forge 四關", value=forge_done, disabled=True)
             st.checkbox("Forge Lab：help / clear / bye", value=lab_done, disabled=True)
             st.checkbox("終端機連續對話 ≥2 輪", value=lab_done, disabled=True)
 
@@ -307,7 +304,7 @@ def render_level(progress: DungeonProgress) -> str:
         )
 
         if not forge_done:
-            render_dungeon_hint("先完成上方 Skill Forge 三關，再來 Forge Lab！")
+            render_dungeon_hint("先完成上方 Skill Forge 四關，再來 Forge Lab！")
             st.text_area(
                 "Loop 模組（自己完成）",
                 value=lab_code,
