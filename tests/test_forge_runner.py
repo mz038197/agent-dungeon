@@ -16,16 +16,39 @@ def test_challenge_c1_fails_wrong_output() -> None:
     assert result.ok is False
 
 
-def test_challenge_c2_passes_without_call() -> None:
-    code = """def speak():
+def test_challenge_c2_passes_with_main() -> None:
+    code = """def main():
     print("Hello")
 """
     result = run_forge_challenge("c2", code)
     assert result.ok is True
+    assert result.has_main is True
+
+
+def test_challenge_c2_fails_without_main() -> None:
+    result = run_forge_challenge("c2", 'print("Hello")')
+    assert result.ok is False
+    assert "main" in result.error
+    assert "註解" in result.error
+
+
+def test_challenge_c2_syntax_error_before_main_message() -> None:
+    code = """def main():
+    # only comment
+"""
+    result = run_forge_challenge("c2", code)
+    assert result.ok is False
+    assert "語法錯誤" in result.error
+
+
+def test_challenge_c2_fails_with_main_in_comment_only() -> None:
+    result = run_forge_challenge("c2", "# def main():\n# print(\"Hello\")")
+    assert result.ok is False
+    assert "main" in result.error
 
 
 def test_challenge_c2_fails_without_print_hello() -> None:
-    code = """def speak():
+    code = """def main():
     print("Hi")
 """
     result = run_forge_challenge("c2", code)
@@ -33,60 +56,84 @@ def test_challenge_c2_fails_without_print_hello() -> None:
     assert 'print("Hello")' in result.error
 
 
-def test_challenge_c2_passes_with_call() -> None:
-    code = """def speak():
-    print("Hello")
-
-speak()
-"""
-    result = run_forge_challenge("c2", code)
-    assert result.ok is True
-
-
 def test_challenge_c3_passes() -> None:
-    code = """def speak():
+    code = """def main():
     print("Hello!")
 
-speak()
+if __name__ == "__main__":
+    main()
 """
     result = run_forge_challenge("c3", code)
     assert result.ok is True
 
 
 def test_challenge_c3_requires_exclamation() -> None:
-    code = """def speak():
+    code = """def main():
     print("Hello")
 
-speak()
+if __name__ == "__main__":
+    main()
 """
     result = run_forge_challenge("c3", code)
     assert result.ok is False
 
 
-def test_forge_lab_passes_with_speak_and_two_lines() -> None:
-    code = """def speak():
+def test_challenge_c3_fails_without_main_call_in_guard() -> None:
+    code = """def main():
+    print("Hello!")
+
+if __name__ == "__main__":
+    pass
+"""
+    result = run_forge_challenge("c3", code)
+    assert result.ok is False
+    assert "__main__" in result.error
+
+
+def test_challenge_c3_fails_main_call_outside_guard() -> None:
+    code = """def main():
+    print("Hello!")
+
+main()
+"""
+    result = run_forge_challenge("c3", code)
+    assert result.ok is False
+    assert "__main__" in result.error
+
+
+def test_challenge_c3_fails_main_call_in_comment_only() -> None:
+    code = """def main():
+    print("Hello!")
+
+if __name__ == "__main__":
+    # main()
+    pass
+"""
+    result = run_forge_challenge("c3", code)
+    assert result.ok is False
+    assert "__main__" in result.error
+
+
+def test_forge_lab_passes_with_main_and_two_lines() -> None:
+    code = """def main():
     print("Hello")
     print("World")
-
-speak()
 """
     result = run_forge_lab_code(code)
     assert result.ok is True
     assert result.line_count >= 2
-    assert result.has_speak is True
+    assert result.has_main is True
 
 
-def test_forge_lab_fails_without_speak() -> None:
+def test_forge_lab_fails_without_main() -> None:
     result = run_forge_lab_code('print("only one line")\nprint("second")')
     assert result.ok is False
-    assert "speak" in result.error.lower()
+    assert "main" in result.error.lower()
 
 
 def test_forge_lab_fails_with_one_line() -> None:
-    code = """def speak():
+    code = """def main():
     print("only one")
-
-speak()
 """
     result = run_forge_lab_code(code)
     assert result.ok is False
@@ -94,6 +141,6 @@ speak()
 
 
 def test_forge_lab_syntax_error() -> None:
-    result = run_forge_lab_code("def speak(\n")
+    result = run_forge_lab_code("def main(\n")
     assert result.ok is False
     assert result.error
