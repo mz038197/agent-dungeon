@@ -1091,13 +1091,27 @@ _LIGHT_COLUMN_PAINT = """
 
   let columnsPainted = false;
 
+  function ensureShellColumns() {
+    const cols = shellColumns(host.document);
+    if (!cols) {
+      columnsPainted = false;
+      return false;
+    }
+    if (
+      !cols[2].classList.contains("dungeon-col-agent")
+      || !cols[1].classList.contains("dungeon-col-center")
+      || !cols[0].classList.contains("dungeon-col-sidebar")
+    ) {
+      paintShellColumns();
+    }
+    columnsPainted = !!shellColumns(host.document);
+    return columnsPainted;
+  }
+
   function paintAll() {
     const topOk = flushShellToTop(host.document);
     const bottomOk = flushShellToBottom(host.document);
-    if (!columnsPainted) {
-      paintShellColumns();
-      columnsPainted = !!shellColumns(host.document);
-    }
+    ensureShellColumns();
     stretchSidebarToFooter(host.document);
     patchMultimodalChatinputIframes(host.document);
     return topOk && bottomOk && columnsPainted;
@@ -1124,6 +1138,7 @@ _LIGHT_COLUMN_PAINT = """
         pending = 0;
         flushShellToTop(host.document);
         flushShellToBottom(host.document);
+        ensureShellColumns();
         stretchSidebarToFooter(host.document);
       });
     }).observe(mainBlock, { childList: true, subtree: true, attributes: true });
@@ -1169,7 +1184,10 @@ def dungeon_shell(
 
     extra_context = ""
     with center:
-        extra_context = render_center(progress) or ""
+        try:
+            extra_context = render_center(progress) or ""
+        except Exception as exc:
+            st.error(f"關卡渲染錯誤：{exc}")
 
     preview_payload = st.session_state.get("agent_column_preview")
     preview_codes: dict[str, str] = {}
