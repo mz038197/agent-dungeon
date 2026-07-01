@@ -5,7 +5,12 @@ from dataclasses import dataclass
 
 import streamlit as st
 
-from agent_dungeon.forge.challenges import BRAIN_FORGE_CHALLENGES, ForgeChallenge, VOICE_FORGE_CHALLENGES
+from agent_dungeon.forge.challenges import (
+    BRAIN_FORGE_CHALLENGES,
+    ForgeChallenge,
+    VOICE_FORGE_CHALLENGES,
+    forge_editor_code_needs_refresh,
+)
 from agent_dungeon.forge.code_checks import has_input_call
 from agent_dungeon.ui.shell_ui import (
     render_editor_hint,
@@ -25,6 +30,12 @@ from agent_dungeon.core.progress import (
 )
 
 COLLAPSE_BUTTON_LABEL = "確認結果，收合此關"
+
+
+def _forge_editor_level(level_id: str) -> str:
+    if level_id == BRAIN_LEVEL_ID:
+        return "brain"
+    return "voice"
 
 
 @dataclass(frozen=True)
@@ -189,9 +200,19 @@ def _render_challenge_card(
             and not has_input_call(str(st.session_state.get(editor_key, "")))
         ):
             st.session_state[editor_key] = code
+        elif not done:
+            current = str(st.session_state.get(editor_key, ""))
+            if editor_key not in st.session_state or not current.strip():
+                st.session_state[editor_key] = code
+            elif forge_editor_code_needs_refresh(
+                challenge,
+                current,
+                expected=code,
+                completed=False,
+                level=_forge_editor_level(config.level_id),
+            ):
+                st.session_state[editor_key] = code
         elif editor_key not in st.session_state:
-            st.session_state[editor_key] = code
-        elif not done and not str(st.session_state.get(editor_key, "")).strip():
             st.session_state[editor_key] = code
 
         edited = st.text_area(

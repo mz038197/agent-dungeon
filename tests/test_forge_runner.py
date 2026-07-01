@@ -58,7 +58,7 @@ def test_challenge_c2_fails_without_print_hello() -> None:
 
 def test_challenge_c3_passes() -> None:
     code = """def main():
-    print("Hello!")
+    print("Hello")
 
 if __name__ == "__main__":
     main()
@@ -67,43 +67,9 @@ if __name__ == "__main__":
     assert result.ok is True
 
 
-def test_challenge_c3_requires_exclamation() -> None:
-    code = """def main():
-    print("Hello")
-
-if __name__ == "__main__":
-    main()
-"""
-    result = run_forge_challenge("c3", code)
-    assert result.ok is False
-
-
 def test_challenge_c3_fails_without_main_call_in_guard() -> None:
     code = """def main():
-    print("Hello!")
-
-if __name__ == "__main__":
-    pass
-"""
-    result = run_forge_challenge("c3", code)
-    assert result.ok is False
-    assert "__main__" in result.error
-
-
-def test_challenge_c3_fails_main_call_outside_guard() -> None:
-    code = """def main():
-    print("Hello!")
-
-main()
-"""
-    result = run_forge_challenge("c3", code)
-    assert result.ok is False
-    assert "__main__" in result.error
-
-
-def test_challenge_c3_fails_main_call_in_comment_only() -> None:
-    code = """def main():
-    print("Hello!")
+    print("Hello")
 
 if __name__ == "__main__":
     # main()
@@ -111,7 +77,30 @@ if __name__ == "__main__":
 """
     result = run_forge_challenge("c3", code)
     assert result.ok is False
-    assert "__main__" in result.error
+    assert "main()" in result.error
+
+
+def test_challenge_c3_fails_main_call_outside_guard() -> None:
+    code = """def main():
+    print("Hello")
+
+main()
+"""
+    result = run_forge_challenge("c3", code)
+    assert result.ok is False
+    assert "main()" in result.error
+
+
+def test_challenge_c3_fails_without_print_hello() -> None:
+    code = """def main():
+    print("Hi")
+
+if __name__ == "__main__":
+    main()
+"""
+    result = run_forge_challenge("c3", code)
+    assert result.ok is False
+    assert "Hello" in result.error
 
 
 def test_forge_lab_passes_with_main_and_two_lines() -> None:

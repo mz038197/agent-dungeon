@@ -199,15 +199,15 @@ def run_forge_challenge(challenge_id: str, source: str) -> ForgeRunResult:
             return ForgeRunResult(
                 ok=False,
                 stdout=stdout,
-                error='請在 if __name__ == "__main__": 區塊內呼叫 main()（不要只寫在註解裡）。',
+                error='請在 `if __name__ == "__main__":` 區塊內呼叫 main()。',
                 line_count=result.line_count,
                 has_main=True,
             )
-        if not _main_body_prints_hello(source.strip(), exclamation=True):
+        if not _main_body_prints_hello(source.strip()):
             return ForgeRunResult(
                 ok=False,
                 stdout=stdout,
-                error='main() 執行後需要輸出 Hello!',
+                error='main() 執行後需要輸出 Hello。',
                 line_count=result.line_count,
                 has_main=True,
             )
