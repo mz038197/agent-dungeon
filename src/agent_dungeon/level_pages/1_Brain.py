@@ -16,9 +16,10 @@ def _bootstrap_pkg_path() -> None:
 
 _bootstrap_pkg_path()
 
+from dataclasses import replace
+
 import streamlit as st
 
-from agent_dungeon.agent.agent_panel import append_assistant_message
 from agent_dungeon.auth.session import get_auth_user
 from agent_dungeon.core.dungeon_context import build_dungeon_extra_context
 from agent_dungeon.core.page_bootstrap import init_dungeon_environment, require_dungeon_login
@@ -41,8 +42,10 @@ from agent_dungeon.forge.challenges import (
     brain_challenge_codes_from_stored,
     challenge_code_for_persist,
     forge_editor_code_needs_refresh,
+    merge_brain_challenge_stored_with_session,
     resolve_stored_lab_code,
 )
+from agent_dungeon.forge.code_checks import has_input_call
 from agent_dungeon.forge.skill_forge_ui import BRAIN_FORGE_CONFIG, render_skill_forge
 from agent_dungeon.ui.dungeon_shell import dungeon_shell
 from agent_dungeon.ui.mission_complete_ui import render_mission_complete_banner
@@ -91,16 +94,48 @@ def _load_brain_page_data(google_sub: str | None) -> dict:
     return load_page_data(PAGE_NAME)
 
 
+def _brain_session_code_overrides() -> dict[str, str]:
+    overrides: dict[str, str] = {}
+    for challenge in BRAIN_FORGE_CHALLENGES:
+        key = f"brain_forge_{challenge.id}_code"
+        if key not in st.session_state:
+            continue
+        raw = str(st.session_state[key])
+        if raw.strip():
+            overrides[challenge.id] = raw
+    return overrides
+
+
 def _challenge_codes_from_state(page_data: dict, progress: DungeonProgress) -> dict[str, str]:
     stored = page_data.get("challenges")
     completed = {
         challenge.id: challenge_complete(progress, challenge.id, level_id=BRAIN_LEVEL_ID)
         for challenge in BRAIN_FORGE_CHALLENGES
     }
-    return brain_challenge_codes_from_stored(
+    merged = merge_brain_challenge_stored_with_session(
         stored if isinstance(stored, dict) else None,
+        session_overrides=_brain_session_code_overrides(),
         completed=completed,
     )
+    return brain_challenge_codes_from_stored(merged, completed=completed)
+
+
+def _persist_forge_challenge_code(google_sub: str | None, challenge_id: str, code: str) -> None:
+    if google_sub is None or not code.strip():
+        return
+    page_data = load_page_data(PAGE_NAME)
+    challenges = page_data.get("challenges")
+    if not isinstance(challenges, dict):
+        challenges = {}
+    challenges[challenge_id] = code
+    page_data["challenges"] = challenges
+    save_page_data(PAGE_NAME, page_data)
+
+
+def _on_brain_challenge_complete(challenge_id: str, code: str) -> None:
+    user = get_auth_user(st.session_state)
+    google_sub = user.google_sub if user is not None else None
+    _persist_forge_challenge_code(google_sub, challenge_id, code)
 
 
 def _sync_forge_code_session(challenge_codes: dict[str, str], progress: DungeonProgress) -> None:
@@ -112,6 +147,9 @@ def _sync_forge_code_session(challenge_codes: dict[str, str], progress: DungeonP
             st.session_state[key] = expected
             continue
         if done:
+            current = str(st.session_state[key])
+            if has_input_call(expected) and not has_input_call(current):
+                st.session_state[key] = expected
             continue
         prev_complete = (
             index > 0
@@ -123,12 +161,22 @@ def _sync_forge_code_session(challenge_codes: dict[str, str], progress: DungeonP
         )
         current = str(st.session_state[key])
         unlock_empty = prev_complete and not current.strip()
-        if unlock_empty or forge_editor_code_needs_refresh(
-            challenge,
-            current,
-            expected=expected,
-            completed=done,
-            level="brain",
+        missing_prior = (
+            prev_complete
+            and challenge.id in {"c2", "c3"}
+            and has_input_call(expected)
+            and not has_input_call(current)
+        )
+        if (
+            unlock_empty
+            or missing_prior
+            or forge_editor_code_needs_refresh(
+                challenge,
+                current,
+                expected=expected,
+                completed=done,
+                level="brain",
+            )
         ):
             st.session_state[key] = expected
 
@@ -271,12 +319,16 @@ def render_level(progress: DungeonProgress) -> str:
             )
 
     render_numbered_section_heading(2, "SKILL FORGE", variant="blue")
+    brain_forge_config = replace(
+        BRAIN_FORGE_CONFIG,
+        on_challenge_complete=_on_brain_challenge_complete,
+    )
     render_skill_forge(
         progress,
         google_sub=google_sub,
         challenge_codes=challenge_codes,
         challenge_stdout=challenge_stdout,
-        config=BRAIN_FORGE_CONFIG,
+        config=brain_forge_config,
     )
 
     render_numbered_section_heading(3, "🧪 FORGE LAB", variant="green")
@@ -325,9 +377,7 @@ def render_level(progress: DungeonProgress) -> str:
                     if google_sub is not None:
                         mark_brain_forge_lab_complete(progress)
                         save_user_progress(google_sub, progress)
-                    reply = result.stdout.strip()
-                    st.session_state[STDOUT_KEY] = reply
-                    append_assistant_message(reply)
+                    st.session_state[STDOUT_KEY] = result.stdout.strip()
                     st.success("Forge Lab 通過！Brain 模組已上線。")
                     st.rerun()
                 else:
