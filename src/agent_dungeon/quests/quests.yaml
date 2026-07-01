@@ -9,22 +9,26 @@ quests:
     title: "Brain"
     subtitle: "替 Agent 裝上大腦"
   - id: "3"
-    module: memory
-    title: "Memory"
-    subtitle: "替 Agent 裝上記憶"
+    module: loop
+    title: "Loop"
+    subtitle: "替 Agent 建立對話迴圈"
   - id: "4"
     module: identity
     title: "Identity"
     subtitle: "建立 Agent 身份"
   - id: "5"
+    module: memory
+    title: "Memory"
+    subtitle: "替 Agent 裝上記憶"
+  - id: "6"
     module: tools
     title: "Tools"
     subtitle: "裝備 Agent 工具"
-  - id: "6"
+  - id: "7"
     module: planning
     title: "Planning"
     subtitle: "教 Agent 規劃"
-  - id: "7"
+  - id: "8"
     module: team
     title: "Team"
     subtitle: "組建 Agent 團隊"

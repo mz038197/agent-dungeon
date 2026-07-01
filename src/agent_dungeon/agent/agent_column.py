@@ -14,6 +14,7 @@ def _render_agent_py_preview(
     lab_code: str,
     brain_challenge_codes: dict[str, str] | None = None,
     brain_lab_code: str = "",
+    agent_py_path: str | None = None,
 ) -> None:
     preview = build_agent_py_preview(
         progress,
@@ -21,6 +22,7 @@ def _render_agent_py_preview(
         lab_code=lab_code,
         brain_challenge_codes=brain_challenge_codes,
         brain_lab_code=brain_lab_code,
+        agent_py_path=agent_py_path,
     )
     st.markdown("**agent.py（建造中）**")
     st.code(preview, language="python")
@@ -35,6 +37,7 @@ def render_agent_column(
     lab_code: str = "",
     brain_challenge_codes: dict[str, str] | None = None,
     brain_lab_code: str = "",
+    agent_py_path: str | None = None,
 ) -> None:
     _render_agent_py_preview(
         progress,
@@ -42,5 +45,6 @@ def render_agent_column(
         lab_code=lab_code,
         brain_challenge_codes=brain_challenge_codes,
         brain_lab_code=brain_lab_code,
+        agent_py_path=agent_py_path,
     )
     render_chat_panel(extra_context=extra_context, page_name=page_name)

@@ -277,6 +277,18 @@ def render_level(progress: DungeonProgress) -> str:
                 result = run_forge_lab_code(code)
                 if result.ok:
                     if google_sub is not None:
+                        from agent_dungeon.forge.agent_py_store import (
+                            ensure_agent_py,
+                            write_module_section,
+                        )
+
+                        ensure_agent_py(google_sub, progress=progress)
+                        write_module_section(
+                            google_sub,
+                            "voice",
+                            code if str(code).strip() else DEFAULT_LAB_CODE,
+                            progress=progress,
+                        )
                         mark_forge_lab_complete(progress)
                         save_user_progress(google_sub, progress)
                     st.session_state[STDOUT_KEY] = result.stdout.strip()

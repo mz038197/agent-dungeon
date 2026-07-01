@@ -1194,6 +1194,7 @@ def dungeon_shell(
     preview_lab = ""
     preview_brain_codes: dict[str, str] = {}
     preview_brain_lab = ""
+    preview_agent_py_path: str | None = None
     if isinstance(preview_payload, dict):
         raw_codes = preview_payload.get("challenge_codes")
         if isinstance(raw_codes, dict):
@@ -1207,6 +1208,9 @@ def dungeon_shell(
         raw_brain_lab = preview_payload.get("brain_lab_code")
         if isinstance(raw_brain_lab, str):
             preview_brain_lab = raw_brain_lab
+        raw_agent_py = preview_payload.get("agent_py_path")
+        if isinstance(raw_agent_py, str) and raw_agent_py.strip():
+            preview_agent_py_path = raw_agent_py.strip()
 
     with right:
         render_agent_column(
@@ -1217,6 +1221,7 @@ def dungeon_shell(
             lab_code=preview_lab,
             brain_challenge_codes=preview_brain_codes,
             brain_lab_code=preview_brain_lab,
+            agent_py_path=preview_agent_py_path,
         )
 
     st.markdown('<div id="dungeon-footer-anchor"></div>', unsafe_allow_html=True)

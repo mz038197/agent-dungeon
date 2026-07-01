@@ -375,6 +375,18 @@ def render_level(progress: DungeonProgress) -> str:
                 )
                 if result.ok:
                     if google_sub is not None:
+                        from agent_dungeon.forge.agent_py_store import (
+                            migrate_page_data_to_agent_py,
+                            write_module_section,
+                        )
+
+                        migrate_page_data_to_agent_py(google_sub, progress=progress)
+                        write_module_section(
+                            google_sub,
+                            "brain",
+                            code if str(code).strip() else DEFAULT_LAB_CODE,
+                            progress=progress,
+                        )
                         mark_brain_forge_lab_complete(progress)
                         save_user_progress(google_sub, progress)
                     st.session_state[STDOUT_KEY] = result.stdout.strip()
@@ -399,9 +411,9 @@ def render_level(progress: DungeonProgress) -> str:
             st.markdown("---")
             render_mission_complete_banner(
                 message="太棒了！你的 Agent 真的會思考了！",
-                next_level_label="Lv.3 Memory",
-                next_level_icon="📗",
-                next_page=None,
+                next_level_label="Lv.3 Loop",
+                next_level_icon="🔁",
+                next_page="level_pages/2_Loop.py",
                 button_key="brain_next_level_btn",
             )
             try:

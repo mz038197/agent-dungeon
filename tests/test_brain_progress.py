@@ -38,7 +38,7 @@ def test_brain_forge_after_voice(peas_home) -> None:
     assert skill_forge_complete(reloaded, level_id=BRAIN_LEVEL_ID) is False
 
 
-def test_brain_lab_complete_unlocks_memory(peas_home) -> None:
+def test_brain_lab_complete_unlocks_loop(peas_home) -> None:
     progress = load_user_progress("sub-b")
     _complete_voice(progress)
     for cid in ("c1", "c2", "c3"):
@@ -48,5 +48,5 @@ def test_brain_lab_complete_unlocks_memory(peas_home) -> None:
 
     reloaded = load_user_progress("sub-b")
     assert reloaded.modules["brain"] == ModuleStatus.COMPLETE
-    assert reloaded.modules["memory"] == ModuleStatus.IN_PROGRESS
+    assert reloaded.modules["loop"] == ModuleStatus.IN_PROGRESS
     assert agent_level(reloaded) == 2

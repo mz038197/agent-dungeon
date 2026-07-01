@@ -8,15 +8,20 @@ from pathlib import Path
 import yaml
 
 from agent_dungeon.core.cloud_paths import APP_ROOT, paths_for_user
-from agent_dungeon.forge.challenges import BRAIN_FORGE_CHALLENGE_IDS, VOICE_FORGE_CHALLENGE_IDS
+from agent_dungeon.forge.challenges import (
+    BRAIN_FORGE_CHALLENGE_IDS,
+    LOOP_FORGE_CHALLENGE_IDS,
+    VOICE_FORGE_CHALLENGE_IDS,
+)
 
 QUESTS_PATH = APP_ROOT / "quests" / "quests.yaml"
 
 MODULE_IDS = (
     "voice",
     "brain",
-    "memory",
+    "loop",
     "identity",
+    "memory",
     "tools",
     "planning",
     "team",
@@ -33,6 +38,12 @@ FORGE_CHALLENGE_IDS = VOICE_FORGE_CHALLENGE_IDS
 
 VOICE_LEVEL_ID = "1"
 BRAIN_LEVEL_ID = "2"
+LOOP_LEVEL_ID = "3"
+IDENTITY_LEVEL_ID = "4"
+MEMORY_LEVEL_ID = "5"
+TOOLS_LEVEL_ID = "6"
+PLANNING_LEVEL_ID = "7"
+TEAM_LEVEL_ID = "8"
 
 CHALLENGE_XP = 33
 XP_PER_LEVEL = 100
@@ -41,6 +52,8 @@ XP_PER_LEVEL = 100
 def forge_challenge_ids_for_level(level_id: str) -> tuple[str, ...]:
     if level_id == BRAIN_LEVEL_ID:
         return BRAIN_FORGE_CHALLENGE_IDS
+    if level_id == LOOP_LEVEL_ID:
+        return LOOP_FORGE_CHALLENGE_IDS
     return VOICE_FORGE_CHALLENGE_IDS
 
 
@@ -85,11 +98,12 @@ def quest_tag(level_id: str) -> str | None:
 _FALLBACK_QUEST_HINTS: tuple[str, ...] = (
     "讓你的 Agent 說出第一句話！（第 1 關）",
     "替 Agent 裝上大腦（第 2 關）",
-    "替 Agent 裝上記憶（第 3 關）",
+    "替 Agent 建立對話迴圈（第 3 關）",
     "建立 Agent 身份（第 4 關）",
-    "裝備 Agent 工具（第 5 關）",
-    "教 Agent 規劃（第 6 關）",
-    "組建 Agent 團隊（第 7 關）",
+    "替 Agent 裝上記憶（第 5 關）",
+    "裝備 Agent 工具（第 6 關）",
+    "教 Agent 規劃（第 7 關）",
+    "組建 Agent 團隊（第 8 關）",
 )
 
 
@@ -271,12 +285,18 @@ def _brain_level_xp(progress: DungeonProgress) -> int:
     return _level_xp(progress, BRAIN_LEVEL_ID)
 
 
+def _loop_level_xp(progress: DungeonProgress) -> int:
+    return _level_xp(progress, LOOP_LEVEL_ID)
+
+
 def agent_level_view(progress: DungeonProgress) -> tuple[int, str, int, int]:
     level = agent_level(progress)
     if level == 0:
         xp = _voice_level_xp(progress)
     elif level == 1:
         xp = _brain_level_xp(progress)
+    elif level == 2:
+        xp = _loop_level_xp(progress)
     else:
         xp = progress.xp
     xp_to_next = progress.xp_to_next or XP_PER_LEVEL
@@ -289,14 +309,24 @@ def _sync_progress_derived_fields(progress: DungeonProgress) -> None:
         if progress.modules.get("brain") == ModuleStatus.LOCKED:
             progress.modules["brain"] = ModuleStatus.IN_PROGRESS
     if progress.modules.get("brain") == ModuleStatus.COMPLETE:
-        if progress.modules.get("memory") == ModuleStatus.LOCKED:
-            progress.modules["memory"] = ModuleStatus.IN_PROGRESS
+        if progress.modules.get("loop") == ModuleStatus.LOCKED:
+            progress.modules["loop"] = ModuleStatus.IN_PROGRESS
+        # 舊版進度：Brain 通關後解鎖 memory → 改為 loop
+        if progress.modules.get("memory") == ModuleStatus.IN_PROGRESS:
+            progress.modules["memory"] = ModuleStatus.LOCKED
+            if progress.modules.get("loop") == ModuleStatus.LOCKED:
+                progress.modules["loop"] = ModuleStatus.IN_PROGRESS
+    if progress.modules.get("loop") == ModuleStatus.COMPLETE:
+        if progress.modules.get("identity") == ModuleStatus.LOCKED:
+            progress.modules["identity"] = ModuleStatus.IN_PROGRESS
     progress.rank_title = f"Lv. {level}"
     progress.next_rank_hint = next_rank_hint_for(progress)
     if level == 0:
         progress.xp = _voice_level_xp(progress)
     elif level == 1:
         progress.xp = _brain_level_xp(progress)
+    elif level == 2:
+        progress.xp = _loop_level_xp(progress)
 
 
 def _level_progress(progress: DungeonProgress, level_id: str) -> LevelProgress | None:
@@ -345,6 +375,11 @@ def mark_forge_challenge_complete(
             return progress
         if agent_level(progress) > 1:
             return progress
+    elif level_id == LOOP_LEVEL_ID:
+        if progress.modules.get("brain") != ModuleStatus.COMPLETE:
+            return progress
+        if agent_level(progress) > 2:
+            return progress
     else:
         return progress
 
@@ -356,6 +391,8 @@ def mark_forge_challenge_complete(
         progress.xp = _voice_level_xp(progress)
     elif level_id == BRAIN_LEVEL_ID:
         progress.xp = _brain_level_xp(progress)
+    elif level_id == LOOP_LEVEL_ID:
+        progress.xp = _loop_level_xp(progress)
     return progress
 
 
@@ -376,7 +413,19 @@ def mark_brain_forge_lab_complete(progress: DungeonProgress) -> DungeonProgress:
     level.forge_lab_complete = True
     level.mission_complete = True
     progress.modules["brain"] = ModuleStatus.COMPLETE
-    progress.modules["memory"] = ModuleStatus.IN_PROGRESS
+    progress.modules["loop"] = ModuleStatus.IN_PROGRESS
+    progress.xp = 0
+    progress.mp += 1
+    _sync_progress_derived_fields(progress)
+    return progress
+
+
+def mark_loop_forge_lab_complete(progress: DungeonProgress) -> DungeonProgress:
+    level = progress.levels.setdefault(LOOP_LEVEL_ID, LevelProgress())
+    level.forge_lab_complete = True
+    level.mission_complete = True
+    progress.modules["loop"] = ModuleStatus.COMPLETE
+    progress.modules["identity"] = ModuleStatus.IN_PROGRESS
     progress.xp = 0
     progress.mp += 1
     _sync_progress_derived_fields(progress)
@@ -395,3 +444,10 @@ def brain_module_online(progress: DungeonProgress) -> bool:
     if level is None:
         return False
     return level.forge_lab_complete or progress.modules.get("brain") == ModuleStatus.COMPLETE
+
+
+def loop_module_online(progress: DungeonProgress) -> bool:
+    level = progress.levels.get(LOOP_LEVEL_ID)
+    if level is None:
+        return False
+    return level.forge_lab_complete or progress.modules.get("loop") == ModuleStatus.COMPLETE

@@ -18,6 +18,7 @@ _PAGE_FILE_PATTERN = re.compile(r"^\d+_.+\.py$")
 TITLE_OVERRIDES = {
     "0_Voice": "Voice",
     "1_Brain": "Brain",
+    "2_Loop": "Loop",
 }
 
 _MULTIMODAL_CHATINPUT_LIGHT_CSS = """

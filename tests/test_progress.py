@@ -8,11 +8,11 @@ from agent_dungeon.core.progress import (
 )
 
 
-def test_load_quests_includes_all_seven_levels() -> None:
+def test_load_quests_includes_all_eight_levels() -> None:
     payload = load_quests_config()
-    assert len(payload["quests"]) == 7
+    assert len(payload["quests"]) == 8
     assert payload["quests"][0]["id"] == "1"
-    assert payload["quests"][-1]["id"] == "7"
+    assert payload["quests"][-1]["id"] == "8"
 
 
 def test_quest_subtitle_level_one() -> None:
@@ -24,6 +24,6 @@ def test_quest_tag_level_one() -> None:
 
 
 def test_agent_next_quest_hints_from_yaml() -> None:
-    assert len(AGENT_NEXT_QUEST_HINTS) == 7
+    assert len(AGENT_NEXT_QUEST_HINTS) == 8
     assert AGENT_NEXT_QUEST_HINTS[0] == "讓你的 Agent 說出第一句話！（第 1 關）"
-    assert "第 7 關" in AGENT_NEXT_QUEST_HINTS[6]
+    assert "第 8 關" in AGENT_NEXT_QUEST_HINTS[7]

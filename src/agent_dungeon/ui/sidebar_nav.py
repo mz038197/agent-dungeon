@@ -13,17 +13,18 @@ from agent_dungeon.core.progress import DungeonProgress, ModuleStatus, agent_lev
 from agent_dungeon.ui.shell_ui import dungeon_file_page, navigation_page_path, overview_page
 
 ModuleId = Literal[
-    "voice", "brain", "memory", "identity", "tools", "planning", "team"
+    "voice", "brain", "loop", "memory", "identity", "tools", "planning", "team"
 ]
 
 MODULE_DEFS: tuple[dict[str, object], ...] = (
     {"id": "voice", "label": "Voice", "icon": "🎙️", "page": "level_pages/0_Voice.py"},
     {"id": "brain", "label": "Brain", "icon": "🧠", "page": "level_pages/1_Brain.py"},
-    {"id": "memory", "label": "Memory", "icon": "📗", "page": "level_pages/2_Memory.py"},
+    {"id": "loop", "label": "Loop", "icon": "🔁", "page": "level_pages/2_Loop.py"},
     {"id": "identity", "label": "Identity", "icon": "🤖", "page": "level_pages/3_Identity.py"},
-    {"id": "tools", "label": "Tools", "icon": "🛠️", "page": "level_pages/4_Tools.py"},
-    {"id": "planning", "label": "Planning", "icon": "🗺️", "page": "level_pages/5_Planning.py"},
-    {"id": "team", "label": "Team", "icon": "👥", "page": "level_pages/6_Team.py"},
+    {"id": "memory", "label": "Memory", "icon": "📗", "page": "level_pages/4_Memory.py"},
+    {"id": "tools", "label": "Tools", "icon": "🛠️", "page": "level_pages/5_Tools.py"},
+    {"id": "planning", "label": "Planning", "icon": "🗺️", "page": "level_pages/6_Planning.py"},
+    {"id": "team", "label": "Team", "icon": "👥", "page": "level_pages/7_Team.py"},
 )
 
 

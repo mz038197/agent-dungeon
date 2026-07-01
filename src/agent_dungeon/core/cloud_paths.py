@@ -42,6 +42,7 @@ class UserPaths:
     profile: Path
     progress: Path
     workspace: Path
+    agent_py: Path
     sessions: Path
     page_data: Path
     chat_images: Path
@@ -59,6 +60,7 @@ def paths_for_user(google_sub: str) -> UserPaths:
         profile=root / "profile.json",
         progress=root / "progress.json",
         workspace=workspace,
+        agent_py=workspace / "agent.py",
         sessions=workspace / "sessions",
         page_data=root / "page_data",
         chat_images=workspace / "uploads" / "chat_images",
@@ -69,6 +71,7 @@ def paths_for_user(google_sub: str) -> UserPaths:
 
 
 def ensure_user_dirs(paths: UserPaths) -> None:
+    paths.workspace.mkdir(parents=True, exist_ok=True)
     paths.sessions.mkdir(parents=True, exist_ok=True)
     paths.page_data.mkdir(parents=True, exist_ok=True)
     paths.chat_images.mkdir(parents=True, exist_ok=True)

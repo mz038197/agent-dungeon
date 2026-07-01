@@ -20,3 +20,5 @@ def test_discover_file_pages_includes_voice_with_relative_ref() -> None:
     assert navigation_page_path(voice.relative_to(app_root).as_posix()) == "level_pages/0_Voice.py"
     brain = next(path for path in pages if path.name == "1_Brain.py")
     assert navigation_page_path(brain.relative_to(app_root).as_posix()) == "level_pages/1_Brain.py"
+    loop = next(path for path in pages if path.name == "2_Loop.py")
+    assert navigation_page_path(loop.relative_to(app_root).as_posix()) == "level_pages/2_Loop.py"

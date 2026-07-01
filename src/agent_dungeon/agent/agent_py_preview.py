@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from agent_dungeon.forge.challenges import BRAIN_FORGE_CHALLENGES, VOICE_FORGE_CHALLENGES
 from agent_dungeon.core.progress import (
     BRAIN_LEVEL_ID,
@@ -83,7 +85,12 @@ def build_agent_py_preview(
     lab_code: str = "",
     brain_challenge_codes: dict[str, str] | None = None,
     brain_lab_code: str = "",
+    agent_py_path: str | None = None,
 ) -> str:
+    if agent_py_path:
+        path = Path(agent_py_path)
+        if path.is_file():
+            return path.read_text(encoding="utf-8")
     lines = [_PREVIEW_HEADER, ""]
     lines.extend(
         _voice_section(

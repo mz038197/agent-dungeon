@@ -9,6 +9,7 @@ CHALLENGE_IDS = ("c1", "c2", "c3")
 
 VOICE_FORGE_CHALLENGE_IDS = CHALLENGE_IDS
 BRAIN_FORGE_CHALLENGE_IDS = CHALLENGE_IDS
+LOOP_FORGE_CHALLENGE_IDS = CHALLENGE_IDS
 
 _BRAIN_C1_LEGACY_STARTER = """# 讀取使用者輸入
 question = input("你想問什麼？ ")
@@ -104,6 +105,70 @@ response = llm.invoke(f"{{prompt}}\\n\\n問題：{{question}}")
 print(response)
 """.strip()
 
+_LOOP_C1_SUFFIX = """def main():
+    # --- 本關：用 while True 包住 Brain 對話邏輯 ---
+    while True:
+        question = input("> ")
+        if question == "bye":
+            break
+        # ↓ 在此放入 Brain 的 prompt / llm / invoke / print
+"""
+
+_LOOP_C2_SUFFIX = """        response = llm.invoke(f"{prompt}\\n\\n問題：{question}")
+        print(response)
+"""
+
+_LOOP_C3_CONTINUE_HINT = """        if not question.strip():
+            continue
+"""
+
+LOOP_FORGE_CHALLENGES: tuple[ForgeChallenge, ...] = (
+    ForgeChallenge(
+        id="c1",
+        label="Challenge 1",
+        title="建立對話迴圈",
+        default_code=_LOOP_C1_SUFFIX.strip(),
+        editor_hint="用 while True 包住 Brain 對話；加上 bye → break，才能在終端機試多輪",
+    ),
+    ForgeChallenge(
+        id="c2",
+        label="Challenge 2",
+        title="連續問答",
+        default_code=_LOOP_C2_SUFFIX.strip(),
+        editor_hint="在迴圈內完成 invoke + print，並在終端機至少聊 2 輪",
+    ),
+    ForgeChallenge(
+        id="c3",
+        label="Final Challenge",
+        title="完善控制流",
+        default_code=_LOOP_C3_CONTINUE_HINT.strip(),
+        editor_hint="空字串 continue；在終端機試空 Enter 不當成新問題",
+    ),
+)
+
+LOOP_LEGACY_LAB_CODE = f"""def main():
+    prompt = "你是一位友善助教。"
+    llm = Brain(model="{DEFAULT_BRAIN_MODEL}")
+    while True:
+        question = input("> ")
+        if question == "bye":
+            break
+        if not question.strip():
+            continue
+        if question == "help":
+            print("指令：help / clear / bye")
+            continue
+        if question == "clear":
+            print("（對話已清除）")
+            continue
+        response = llm.invoke(f"{{prompt}}\\n\\n問題：{{question}}")
+        print(response)
+
+
+if __name__ == "__main__":
+    main()
+""".strip()
+
 
 def resolve_stored_lab_code(
     stored: str | None,
@@ -121,7 +186,12 @@ def resolve_stored_lab_code(
 
 
 def challenge_by_id(challenge_id: str, *, level: str = "voice") -> ForgeChallenge | None:
-    challenges = BRAIN_FORGE_CHALLENGES if level == "brain" else VOICE_FORGE_CHALLENGES
+    if level == "brain":
+        challenges = BRAIN_FORGE_CHALLENGES
+    elif level == "loop":
+        challenges = LOOP_FORGE_CHALLENGES
+    else:
+        challenges = VOICE_FORGE_CHALLENGES
     for challenge in challenges:
         if challenge.id == challenge_id:
             return challenge
@@ -257,6 +327,13 @@ def forge_editor_code_needs_refresh(
             expected=expected,
             completed=completed,
         )
+    if level == "loop":
+        return brain_editor_code_needs_refresh(
+            challenge,
+            current,
+            expected=expected,
+            completed=completed,
+        )
     return voice_editor_code_needs_refresh(
         challenge,
         current,
@@ -342,6 +419,61 @@ def brain_challenge_codes_from_stored(
             if prior
             else challenge.default_code
         )
+        stored_raw = stored.get(challenge.id) if isinstance(stored, dict) else None
+        codes[challenge.id] = resolve_stored_brain_challenge_code(
+            challenge,
+            stored_raw if isinstance(stored_raw, str) else None,
+            default=default,
+            completed=done.get(challenge.id, False),
+        )
+        if done.get(challenge.id, False):
+            prior = codes[challenge.id]
+        elif codes[challenge.id].strip():
+            prior = codes[challenge.id]
+    return codes
+
+
+def _carry_forward_loop_code(
+    challenge: ForgeChallenge,
+    *,
+    prior_code: str,
+    brain_seed: str,
+) -> str:
+    prior = prior_code.strip()
+    if challenge.id == "c1":
+        if prior:
+            return prior
+        base = _LOOP_C1_SUFFIX.strip()
+        if brain_seed.strip():
+            return f"{base}\n        # （參考 Brain 模組）\n"
+        return base
+    if not prior:
+        return challenge.default_code
+    suffix = challenge.default_code.strip()
+    return f"{prior}\n{suffix}"
+
+
+def loop_challenge_codes_from_stored(
+    stored: dict | None,
+    *,
+    completed: dict[str, bool] | None = None,
+    brain_seed: str = "",
+) -> dict[str, str]:
+    done = completed or {}
+    codes: dict[str, str] = {}
+    prior = ""
+    for challenge in LOOP_FORGE_CHALLENGES:
+        default = (
+            _carry_forward_loop_code(challenge, prior_code=prior, brain_seed=brain_seed)
+            if prior or challenge.id == "c1"
+            else challenge.default_code
+        )
+        if challenge.id == "c1" and not prior:
+            default = _carry_forward_loop_code(
+                challenge,
+                prior_code="",
+                brain_seed=brain_seed,
+            )
         stored_raw = stored.get(challenge.id) if isinstance(stored, dict) else None
         codes[challenge.id] = resolve_stored_brain_challenge_code(
             challenge,
