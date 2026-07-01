@@ -8,6 +8,7 @@ from agent_dungeon.forge.challenges import (
     challenge_code_for_persist,
     challenge_codes_from_stored,
     forge_editor_code_needs_refresh,
+    merge_brain_challenge_stored_with_session,
     voice_editor_code_needs_refresh,
 )
 from agent_dungeon.forge.llm_provider import DEFAULT_BRAIN_MODEL
@@ -48,6 +49,33 @@ def test_c3_legacy_answer_not_replaced_by_c2_stored_code() -> None:
     assert LEGACY_ANSWER_CODES["c3"] != codes["c3"]
 
 
+def test_brain_c2_carry_forward_uses_session_c1_when_stored_default() -> None:
+    c1_code = 'question = input("q")\nprint(question)'
+    stored = {"c1": BRAIN_FORGE_CHALLENGES[0].default_code, "c2": BRAIN_FORGE_CHALLENGES[1].default_code}
+    completed = {"c1": True, "c2": False}
+    merged = merge_brain_challenge_stored_with_session(
+        stored,
+        session_overrides={"c1": c1_code},
+        completed=completed,
+    )
+    codes = brain_challenge_codes_from_stored(merged, completed=completed)
+    assert codes["c2"].startswith(c1_code)
+    assert "input(" in codes["c2"]
+    assert "本關" in codes["c2"]
+
+
+def test_brain_c2_comment_only_input_does_not_block_carry_forward() -> None:
+    c1_code = 'question = input("q")\nprint(question)'
+    comment_only_c2 = f"{BRAIN_FORGE_CHALLENGES[0].default_code}\n\n{BRAIN_FORGE_CHALLENGES[1].default_code}"
+    stored = {"c1": c1_code, "c2": comment_only_c2}
+    codes = brain_challenge_codes_from_stored(
+        stored,
+        completed={"c1": True, "c2": False},
+    )
+    assert codes["c2"].startswith(c1_code)
+    assert "本關" in codes["c2"]
+
+
 def test_brain_c2_stored_suffix_only_uses_carry_forward() -> None:
     c1_code = 'question = input("q")\nprint(question)'
     stored = {"c1": c1_code, "c2": BRAIN_FORGE_CHALLENGES[1].default_code}
@@ -56,8 +84,18 @@ def test_brain_c2_stored_suffix_only_uses_carry_forward() -> None:
         completed={"c1": True, "c2": False},
     )
     assert "input(" in codes["c2"]
-    assert "Brain(" in codes["c2"]
     assert codes["c2"].startswith(c1_code)
+    assert f'llm = Brain(model="{DEFAULT_BRAIN_MODEL}")' not in codes["c2"]
+    assert "本關" in codes["c2"]
+
+
+def test_brain_c2_legacy_answer_replaced_with_comment_hint() -> None:
+    from agent_dungeon.forge.challenges import _BRAIN_C2_LEGACY_ANSWER
+
+    stored = {"c2": _BRAIN_C2_LEGACY_ANSWER}
+    codes = brain_challenge_codes_from_stored(stored, completed={"c2": False})
+    assert f'llm = Brain(model="{DEFAULT_BRAIN_MODEL}")' not in codes["c2"]
+    assert "例如" in codes["c2"]
 
 
 def test_brain_c3_stored_suffix_only_uses_carry_forward() -> None:

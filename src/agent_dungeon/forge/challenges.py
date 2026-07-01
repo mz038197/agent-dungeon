@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from agent_dungeon.forge.code_checks import has_input_call
 from agent_dungeon.forge.llm_provider import DEFAULT_BRAIN_MODEL
 
 CHALLENGE_IDS = ("c1", "c2", "c3")
@@ -48,7 +49,10 @@ VOICE_FORGE_CHALLENGES: tuple[ForgeChallenge, ...] = (
     ),
 )
 
-_BRAIN_C2_SUFFIX = f"""# --- 本關：建立 Brain（選一個 model）---
+_BRAIN_C2_SUFFIX = """# --- 本關：建立 Brain（選一個 model）---
+# 在此建立 Brain，例如：llm = Brain(model="...")"""
+
+_BRAIN_C2_LEGACY_ANSWER = f"""# --- 本關：建立 Brain（選一個 model）---
 llm = Brain(model="{DEFAULT_BRAIN_MODEL}")"""
 
 _BRAIN_C3_SUFFIX = """# --- 本關：完成 Brain 安裝 ---
@@ -162,10 +166,12 @@ def _brain_stored_needs_carry_forward(
         return True
     if challenge.id == "c1" and stripped == _BRAIN_C1_LEGACY_STARTER:
         return True
-    if challenge.id == "c2" and "input(" not in stripped:
+    if challenge.id == "c2" and stripped == _BRAIN_C2_LEGACY_ANSWER.strip():
+        return True
+    if challenge.id == "c2" and not has_input_call(stripped):
         return True
     if challenge.id == "c3":
-        if "input(" not in stripped or "Brain(" not in stripped:
+        if not has_input_call(stripped) or "Brain(" not in stripped:
             return True
         if "invoke" not in stripped and stripped == challenge.default_code.strip():
             return True
@@ -300,6 +306,26 @@ def _carry_forward_brain_code(
         return challenge.default_code
     suffix = challenge.default_code.strip()
     return f"{prior}\n\n{suffix}"
+
+
+def merge_brain_challenge_stored_with_session(
+    stored: dict | None,
+    *,
+    session_overrides: dict[str, str] | None = None,
+    completed: dict[str, bool] | None = None,
+) -> dict | None:
+    """將已完成關卡的 session 編輯器內容合併進 stored，供 carry-forward 使用。"""
+    if not session_overrides:
+        return stored if isinstance(stored, dict) else None
+    done = completed or {}
+    merged = dict(stored) if isinstance(stored, dict) else {}
+    for challenge in BRAIN_FORGE_CHALLENGES:
+        raw = session_overrides.get(challenge.id)
+        if not isinstance(raw, str) or not raw.strip():
+            continue
+        if done.get(challenge.id, False):
+            merged[challenge.id] = raw
+    return merged
 
 
 def brain_challenge_codes_from_stored(
