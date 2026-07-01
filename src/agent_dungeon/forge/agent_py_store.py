@@ -7,26 +7,15 @@ from typing import Literal
 
 from agent_dungeon.core.cloud_paths import page_data_path, paths_for_user
 from agent_dungeon.core.progress import (
-    BRAIN_LEVEL_ID,
     DungeonProgress,
     ModuleStatus,
-    VOICE_LEVEL_ID,
     brain_module_online,
-    voice_module_online,
 )
-from agent_dungeon.forge.challenges import BRAIN_LEGACY_LAB_CODE, VOICE_LEGACY_LAB_CODE
-from agent_dungeon.forge.llm_provider import DEFAULT_BRAIN_MODEL
+from agent_dungeon.forge.forge_runtime.registry import build_platform_header
 
 ModuleName = Literal["voice", "brain", "loop"]
 
-_HEADER = '''\
-"""Agent Dungeon — 你的 Agent（agent.py）"""
-import os
-
-from agent_dungeon.forge.agent_runtime import get_brain_class
-
-Brain = get_brain_class(os.environ.get("AGENT_DUNGEON_USER_SUB") or None)
-'''
+_HEADER = build_platform_header(progress=None) + "\n"
 
 _VOICE_START = "# === Voice 模組 ==="
 _VOICE_END = "# === /Voice 模組 ==="
@@ -41,42 +30,18 @@ _MODULE_MARKERS: dict[ModuleName, tuple[str, str]] = {
     "loop": (_LOOP_START, _LOOP_END),
 }
 
-_DEFAULT_VOICE_BODY = VOICE_LEGACY_LAB_CODE.strip()
+_CHAPTER_VOICE = "# --- Voice ---"
+_CHAPTER_BRAIN = "# --- Brain ---"
+_CHAPTER_LOOP = "# --- Loop ---"
 
-_DEFAULT_BRAIN_BODY = BRAIN_LEGACY_LAB_CODE.strip()
-
-_DEFAULT_LOOP_BODY = f'''\
-def main():
-    """Loop 模組：持續對話（Forge Lab 自由完成）。"""
-    prompt = "你是一位友善助教。"
-    llm = Brain(model="{DEFAULT_BRAIN_MODEL}")
-    while True:
-        question = input("> ")
-        if question == "bye":
-            break
-        if not question.strip():
-            continue
-        response = llm.invoke(f"{{prompt}}\\n\\n問題：{{question}}")
-        print(response)
-
-
-if __name__ == "__main__":
+_MAIN_ENTRY = '''if __name__ == "__main__":
     main()
-'''.strip()
+'''
 
-_DEFAULT_MAIN_VOICE = """\
-if __name__ == "__main__":
-    speak()
-"""
-
-_DEFAULT_MAIN_BRAIN = """\
-if __name__ == "__main__":
-    prompt = "你是一位英文助教，用簡單英文回答。"
-    llm = Brain(model="{model}")
-    question = input("你想問什麼？ ")
-    response = llm.invoke(f"{{prompt}}\\n\\n問題：{{question}}")
-    print(response)
-""".format(model=DEFAULT_BRAIN_MODEL)
+_MAIN_DEF_RE = re.compile(
+    r"^def main\s*\([^)]*\)\s*:\s*\n(.*?)(?=^(?:def |if __name__|\Z))",
+    re.MULTILINE | re.DOTALL,
+)
 
 
 def agent_py_path(google_sub: str) -> Path:
@@ -109,56 +74,80 @@ def get_module_section(source: str, module: ModuleName) -> str:
     return match.group(1).strip()
 
 
-def _replace_section(source: str, module: ModuleName, body: str) -> str:
-    start, end = _MODULE_MARKERS[module]
-    block = f"{start}\n{body.strip()}\n{end}"
-    pattern = _section_pattern(start, end)
-    if pattern.search(source):
-        return pattern.sub(block, source, count=1)
-    return source.rstrip() + "\n\n" + block + "\n"
+def normalize_to_main_function(code: str) -> str:
+    """將編輯器內容正規化為含 def main(): 的完整函式（不含 if __name__）。"""
+    text = code.strip()
+    if not text:
+        return "def main():\n    pass"
+    if re.search(r"^def main\s*\(", text, re.MULTILINE):
+        text = re.sub(
+            r"\nif __name__ == ['\"]__main__['\"]:.*\Z",
+            "",
+            text,
+            flags=re.DOTALL,
+        ).rstrip()
+        return text
+    indented = "\n".join(f"    {line}" if line.strip() else "" for line in text.splitlines())
+    return f"def main():\n{indented}"
 
 
-def _default_body(module: ModuleName) -> str:
-    if module == "voice":
-        return _DEFAULT_VOICE_BODY
-    if module == "brain":
-        return _DEFAULT_BRAIN_BODY
-    return _DEFAULT_LOOP_BODY
+def extract_agent_main_source(source: str) -> str:
+    """從 agent.py 取出 def main(): …（含 def 行）；舊版多區塊格式會自動合併。"""
+    if not source.strip():
+        return "def main():\n    pass"
+
+    match = _MAIN_DEF_RE.search(source)
+    if match:
+        body = match.group(0).rstrip()
+        if body:
+            return body
+
+    loop = get_module_section(source, "loop")
+    if loop and not loop.startswith("# 🔒") and "def main" in loop:
+        return normalize_to_main_function(loop)
+
+    brain = get_module_section(source, "brain")
+    if brain and not brain.startswith("# 🔒") and brain.strip():
+        return normalize_to_main_function(brain)
+
+    voice = get_module_section(source, "voice")
+    if voice and not voice.startswith("# 🔒") and voice.strip():
+        return normalize_to_main_function(voice)
+
+    return "def main():\n    pass"
 
 
-def _main_for_progress(progress: DungeonProgress) -> str:
-    if progress.modules.get("brain") == ModuleStatus.COMPLETE or brain_module_online(progress):
-        loop_body = _DEFAULT_LOOP_BODY
-        if "def main():" in loop_body:
-            return 'if __name__ == "__main__":\n    main()\n'
-    if progress.modules.get("voice") == ModuleStatus.COMPLETE or brain_module_online(progress):
-        if brain_module_online(progress):
-            return _DEFAULT_MAIN_BRAIN.strip() + "\n"
-        return _DEFAULT_MAIN_VOICE.strip() + "\n"
-    return _DEFAULT_MAIN_VOICE.strip() + "\n"
+def read_agent_main_body(google_sub: str | None, *, progress: DungeonProgress | None = None) -> str:
+    if google_sub is None:
+        return "def main():\n    pass"
+    migrate_page_data_to_agent_py(google_sub, progress=progress or DungeonProgress())
+    path = agent_py_path(google_sub)
+    return extract_agent_main_source(read_agent_py(path))
+
+
+def _marker_lines() -> str:
+    return (
+        f"{_VOICE_START}\n"
+        f"{_CHAPTER_VOICE}\n"
+        f"{_VOICE_END}\n\n"
+        f"{_BRAIN_START}\n"
+        f"{_CHAPTER_BRAIN}\n"
+        f"{_BRAIN_END}\n\n"
+        f"{_LOOP_START}\n"
+        f"{_CHAPTER_LOOP}\n"
+        f"{_LOOP_END}"
+    )
+
+
+def build_agent_py_from_main(main_source: str, *, progress: DungeonProgress | None = None) -> str:
+    progress = progress or DungeonProgress()
+    header = build_platform_header(progress=progress).strip()
+    main_fn = normalize_to_main_function(main_source)
+    return f"{header}\n\n{_marker_lines()}\n\n{main_fn}\n\n{_MAIN_ENTRY.strip()}\n"
 
 
 def build_agent_py_template(*, progress: DungeonProgress | None = None) -> str:
-    progress = progress or DungeonProgress()
-    voice_body = _default_body("voice") if voice_module_online(progress) else "# 🔒 完成 Voice 後解鎖"
-    brain_body = (
-        _default_body("brain")
-        if brain_module_online(progress)
-        else ("# 🔒 完成 Voice 後解鎖" if progress.modules.get("voice") != ModuleStatus.COMPLETE else "# 🔒 完成 Skill Forge 解鎖")
-    )
-    loop_body = (
-        _DEFAULT_LOOP_BODY.split("if __name__")[0].strip()
-        if progress.modules.get("brain") == ModuleStatus.COMPLETE
-        else "# 🔒 完成 Brain 後解鎖"
-    )
-    main_block = _main_for_progress(progress)
-    return (
-        f"{_HEADER.strip()}\n\n"
-        f"{_VOICE_START}\n{voice_body}\n{_VOICE_END}\n\n"
-        f"{_BRAIN_START}\n{brain_body}\n{_BRAIN_END}\n\n"
-        f"{_LOOP_START}\n{loop_body}\n{_LOOP_END}\n\n"
-        f"{main_block.strip()}\n"
-    )
+    return build_agent_py_from_main("def main():\n    pass", progress=progress)
 
 
 def ensure_agent_py(google_sub: str, *, progress: DungeonProgress | None = None) -> Path:
@@ -168,39 +157,23 @@ def ensure_agent_py(google_sub: str, *, progress: DungeonProgress | None = None)
     return path
 
 
-def write_module_section(
+def write_agent_main_body(
     google_sub: str,
-    module: ModuleName,
-    body: str,
+    main_source: str,
     *,
     progress: DungeonProgress | None = None,
 ) -> Path:
     path = ensure_agent_py(google_sub, progress=progress)
-    source = read_agent_py(path)
-    updated = _replace_section(source, module, body)
-    if module == "brain" and get_module_section(updated, "brain").startswith("# 🔒"):
-        updated = _replace_section(updated, "brain", body)
-    if module == "voice":
-        updated = _replace_section(updated, "voice", body)
-    write_agent_py(path, updated)
+    write_agent_py(path, build_agent_py_from_main(main_source, progress=progress))
     return path
 
 
 def sync_main_entry(google_sub: str, *, progress: DungeonProgress) -> None:
+    """保留 API；統一 main 架構下 main 入口已在 build_agent_py_from_main 內。"""
     path = ensure_agent_py(google_sub, progress=progress)
     source = read_agent_py(path)
-    main_block = _main_for_progress(progress)
-    if re.search(r"if __name__ == ['\"]__main__['\"]", source):
-        source = re.sub(
-            r"\nif __name__ == ['\"]__main__['\"]:.*\Z",
-            "",
-            source,
-            flags=re.DOTALL,
-        ).rstrip()
-    loop_section = get_module_section(source, "loop")
-    if progress.modules.get("brain") == ModuleStatus.COMPLETE and "def main():" in loop_section:
-        main_block = 'if __name__ == "__main__":\n    main()\n'
-    write_agent_py(path, source + "\n\n" + main_block.strip() + "\n")
+    main_body = extract_agent_main_source(source)
+    write_agent_py(path, build_agent_py_from_main(main_body, progress=progress))
 
 
 def _load_page_json(path: Path) -> dict:
@@ -213,22 +186,52 @@ def _load_page_json(path: Path) -> dict:
     return raw if isinstance(raw, dict) else {}
 
 
+def _latest_challenge_code(page_data: dict, level: str) -> str:
+    challenges = page_data.get("challenges")
+    if not isinstance(challenges, dict):
+        return ""
+    for cid in ("c4", "c3", "c2", "c1"):
+        raw = challenges.get(cid)
+        if isinstance(raw, str) and raw.strip():
+            return raw.strip()
+    code = page_data.get("code")
+    if isinstance(code, str) and code.strip():
+        return code.strip()
+    return ""
+
+
 def migrate_page_data_to_agent_py(google_sub: str, *, progress: DungeonProgress) -> Path:
     path = ensure_agent_py(google_sub, progress=progress)
+    if extract_agent_main_source(read_agent_py(path)) != "def main():\n    pass":
+        return path
+
     paths = paths_for_user(google_sub)
     voice_data = _load_page_json(page_data_path("Voice", paths))
     brain_data = _load_page_json(page_data_path("Brain", paths))
+    loop_data = _load_page_json(page_data_path("Loop", paths))
 
-    source = read_agent_py(path)
-    voice_code = voice_data.get("code")
-    if isinstance(voice_code, str) and voice_code.strip() and voice_module_online(progress):
-        source = _replace_section(source, "voice", voice_code.strip())
-    brain_code = brain_data.get("code")
-    if isinstance(brain_code, str) and brain_code.strip() and brain_module_online(progress):
-        source = _replace_section(source, "brain", brain_code.strip())
-    write_agent_py(path, source)
-    sync_main_entry(google_sub, progress=progress)
+    main_source = ""
+    if loop_data and progress.modules.get("loop") != ModuleStatus.LOCKED:
+        main_source = _latest_challenge_code(loop_data, "loop") or str(loop_data.get("code") or "")
+    if not main_source.strip() and brain_data and brain_module_online(progress):
+        main_source = _latest_challenge_code(brain_data, "brain") or str(brain_data.get("code") or "")
+    if not main_source.strip() and voice_data and voice_module_online(progress):
+        main_source = _latest_challenge_code(voice_data, "voice") or str(voice_data.get("code") or "")
+
+    if main_source.strip():
+        write_agent_main_body(google_sub, main_source, progress=progress)
     return path
+
+
+def write_module_section(
+    google_sub: str,
+    module: ModuleName,
+    body: str,
+    *,
+    progress: DungeonProgress | None = None,
+) -> Path:
+    """向後相容：Forge 關卡完成後寫入統一 main()。"""
+    return write_agent_main_body(google_sub, body, progress=progress)
 
 
 def write_loop_module_body(
@@ -237,11 +240,7 @@ def write_loop_module_body(
     *,
     progress: DungeonProgress | None = None,
 ) -> Path:
-    text = body.strip()
-    if "def main" not in text:
-        indented = "\n".join(f"    {line}" if line.strip() else "" for line in text.splitlines())
-        text = f"def main():\n{indented}"
-    return write_module_section(google_sub, "loop", text, progress=progress)
+    return write_agent_main_body(google_sub, body, progress=progress)
 
 
 def read_module_for_editor(
@@ -254,8 +253,7 @@ def read_module_for_editor(
     if google_sub is None:
         return fallback
     migrate_page_data_to_agent_py(google_sub, progress=progress or DungeonProgress())
-    path = agent_py_path(google_sub)
-    section = get_module_section(read_agent_py(path), module)
-    if section and not section.startswith("# 🔒"):
-        return section
+    main_body = read_agent_main_body(google_sub, progress=progress)
+    if main_body.strip() and main_body.strip() != "def main():\n    pass":
+        return main_body
     return fallback

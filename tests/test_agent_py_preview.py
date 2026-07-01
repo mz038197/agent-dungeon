@@ -13,6 +13,7 @@ def test_preview_locked_before_forge() -> None:
     assert "# agent.py — 建造中" in preview
     assert "# 🔒 完成 Skill Forge 解鎖" in preview
     assert "# 🔒 尚未解鎖" in preview
+    assert "def main():" in preview
 
 
 def test_preview_grows_with_c1() -> None:
@@ -31,10 +32,10 @@ def test_preview_uses_lab_code_when_voice_online() -> None:
     mark_forge_challenge_complete(progress, "c1")
     mark_forge_challenge_complete(progress, "c2")
     mark_forge_challenge_complete(progress, "c3")
-    lab = '''def speak():
+    lab = """def main():
     print("Hi there!")
     print("I am ready.")
-speak()'''
+"""
     mark_forge_lab_complete(progress)
     preview = build_agent_py_preview(
         progress,
