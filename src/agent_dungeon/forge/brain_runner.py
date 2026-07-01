@@ -5,6 +5,7 @@ import io
 from contextlib import redirect_stdout
 from dataclasses import dataclass
 
+from agent_dungeon.forge.code_checks import has_input_call
 from agent_dungeon.forge.llm_provider import DEFAULT_BRAIN_MODEL, make_brain_class, model_in_allowlist
 
 BRAIN_CHALLENGE_IDS = ("c1", "c2", "c3")
@@ -40,18 +41,6 @@ def _parse_tree(source: str) -> ast.AST | None:
         return ast.parse(source)
     except SyntaxError:
         return None
-
-
-def _has_input_call(source: str) -> bool:
-    tree = _parse_tree(source)
-    if tree is None:
-        return False
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Call):
-            func = node.func
-            if isinstance(func, ast.Name) and func.id == "input":
-                return True
-    return False
 
 
 def _brain_model_from_source(source: str) -> str | None:
@@ -193,7 +182,7 @@ def run_brain_forge_challenge(
     stripped = source.strip()
 
     if challenge_id == "c1":
-        if not _has_input_call(stripped):
+        if not has_input_call(stripped):
             return BrainForgeRunResult(
                 ok=False,
                 stdout=stdout,
@@ -221,7 +210,7 @@ def run_brain_forge_challenge(
                 stdout=stdout,
                 error=f"model {model!r} 不在允許清單中。",
             )
-        if not _has_input_call(stripped):
+        if not has_input_call(stripped):
             return BrainForgeRunResult(
                 ok=False,
                 stdout=stdout,
@@ -230,7 +219,7 @@ def run_brain_forge_challenge(
         return BrainForgeRunResult(ok=True, stdout=stdout)
 
     if challenge_id == "c3":
-        if not _has_input_call(stripped):
+        if not has_input_call(stripped):
             return BrainForgeRunResult(ok=False, stdout=stdout, error="需要 input()。")
         model = _brain_model_from_source(stripped)
         if model is None or not model_in_allowlist(model):
