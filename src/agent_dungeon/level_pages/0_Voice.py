@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+from dataclasses import replace
 from pathlib import Path
 
 
@@ -39,9 +40,10 @@ from agent_dungeon.forge.challenges import (
     challenge_codes_from_stored,
     forge_editor_code_needs_refresh,
     resolve_stored_lab_code,
+    voice_forge_lab_seed_code,
 )
 from agent_dungeon.forge.runner import run_forge_lab_code
-from agent_dungeon.forge.skill_forge_ui import render_skill_forge
+from agent_dungeon.forge.skill_forge_ui import VOICE_FORGE_CONFIG, render_skill_forge
 from agent_dungeon.ui.dungeon_shell import dungeon_shell
 from agent_dungeon.ui.mission_complete_ui import render_mission_complete_banner
 from agent_dungeon.ui.section_heading_ui import render_level_heading, render_numbered_section_heading
@@ -135,10 +137,13 @@ def _sync_forge_code_session(challenge_codes: dict[str, str], progress: DungeonP
 def _sync_lab_code_session(lab_code: str, *, lab_done: bool, forge_done: bool) -> None:
     if not forge_done or lab_done:
         return
-    if st.session_state.get(LAB_CODE_KEY) is None or not str(
-        st.session_state.get(LAB_CODE_KEY, "")
-    ).strip():
+    current = str(st.session_state.get(LAB_CODE_KEY, ""))
+    if LAB_CODE_KEY not in st.session_state or not current.strip():
         st.session_state[LAB_CODE_KEY] = lab_code
+        return
+    if lab_code.strip() and current.strip() != lab_code.strip():
+        if not current.strip() or current.strip() == VOICE_LEGACY_LAB_CODE.strip():
+            st.session_state[LAB_CODE_KEY] = lab_code
 
 
 def _challenge_stdout_from_state(page_data: dict) -> dict[str, str]:
@@ -152,13 +157,67 @@ def _challenge_stdout_from_state(page_data: dict) -> dict[str, str]:
     return stdout_map
 
 
-def _lab_code_from_state(page_data: dict, *, lab_done: bool) -> str:
+def _lab_code_from_state(
+    page_data: dict,
+    challenge_codes: dict[str, str],
+    *,
+    lab_done: bool,
+    forge_done: bool,
+) -> str:
     raw = page_data.get("code")
-    return resolve_stored_lab_code(
+    stored = resolve_stored_lab_code(
         raw if isinstance(raw, str) else None,
         legacy=VOICE_LEGACY_LAB_CODE,
         lab_done=lab_done,
     )
+    if lab_done:
+        return stored
+    if forge_done:
+        draft = stored.strip()
+        if draft and draft != VOICE_LEGACY_LAB_CODE.strip():
+            return stored
+        seed = voice_forge_lab_seed_code(challenge_codes)
+        if seed.strip():
+            return seed
+    return stored
+
+
+def _make_voice_challenge_complete_handler(progress: DungeonProgress):
+    def _handler(challenge_id: str, code: str) -> None:
+        del challenge_id
+        user = get_auth_user(st.session_state)
+        google_sub = user.google_sub if user is not None else None
+        if google_sub is None:
+            return
+        from agent_dungeon.forge.agent_py_store import sync_voice_forge_challenge_to_agent_py
+
+        sync_voice_forge_challenge_to_agent_py(google_sub, code, progress=progress)
+
+    return _handler
+
+
+def _migrate_voice_challenge_stored(
+    page_data: dict,
+    challenge_codes: dict[str, str],
+    progress: DungeonProgress,
+    *,
+    google_sub: str | None,
+) -> None:
+    stored = page_data.get("challenges")
+    if not isinstance(stored, dict) or google_sub is None:
+        return
+    changed = False
+    for challenge in VOICE_FORGE_CHALLENGES:
+        if challenge_complete(progress, challenge.id):
+            continue
+        resolved = challenge_codes.get(challenge.id, challenge.default_code)
+        raw = stored.get(challenge.id)
+        if isinstance(raw, str) and raw.strip() != resolved.strip():
+            stored[challenge.id] = resolved
+            changed = True
+    if changed:
+        page_data["challenges"] = stored
+        save_page_data(PAGE_NAME, page_data)
 
 
 def _persist_voice_page_data(
@@ -167,6 +226,7 @@ def _persist_voice_page_data(
     progress: DungeonProgress,
     *,
     lab_done: bool,
+    challenge_codes: dict[str, str],
 ) -> None:
     if google_sub is None:
         return
@@ -179,7 +239,7 @@ def _persist_voice_page_data(
         if code_key in st.session_state:
             codes[challenge.id] = challenge_code_for_persist(
                 str(st.session_state[code_key]),
-                default=challenge.default_code,
+                default=challenge_codes.get(challenge.id, challenge.default_code),
                 completed=done,
             )
         if stdout_key in st.session_state:
@@ -190,7 +250,8 @@ def _persist_voice_page_data(
         page_data["lab_stdout"] = str(st.session_state[STDOUT_KEY])
     raw_lab = page_data.get("code")
     if isinstance(raw_lab, str) and not raw_lab.strip() and not lab_done:
-        page_data["code"] = DEFAULT_LAB_CODE
+        seed = voice_forge_lab_seed_code(challenge_codes)
+        page_data["code"] = seed if seed.strip() else DEFAULT_LAB_CODE
     save_page_data(PAGE_NAME, page_data)
 
 
@@ -202,9 +263,25 @@ def render_level(progress: DungeonProgress) -> str:
 
     page_data = _load_voice_page_data(google_sub)
     challenge_codes = _challenge_codes_from_state(page_data, progress)
+    _migrate_voice_challenge_stored(
+        page_data,
+        challenge_codes,
+        progress,
+        google_sub=google_sub,
+    )
+    challenge_codes = _challenge_codes_from_state(page_data, progress)
     _sync_forge_code_session(challenge_codes, progress)
+    if google_sub is not None:
+        from agent_dungeon.forge.agent_py_store import backfill_voice_forge_to_agent_py
+
+        backfill_voice_forge_to_agent_py(google_sub, challenge_codes, progress=progress)
     challenge_stdout = _challenge_stdout_from_state(page_data)
-    lab_code = _lab_code_from_state(page_data, lab_done=lab_done)
+    lab_code = _lab_code_from_state(
+        page_data,
+        challenge_codes,
+        lab_done=lab_done,
+        forge_done=forge_done,
+    )
     _sync_lab_code_session(lab_code, lab_done=lab_done, forge_done=forge_done)
 
     render_level_heading(1, VOICE_LEVEL_SUBTITLE, tag=quest_tag(VOICE_LEVEL_ID))
@@ -235,11 +312,16 @@ def render_level(progress: DungeonProgress) -> str:
             st.checkbox("定義 main() 並輸出至少兩句話", value=lab_done, disabled=True)
 
     render_numbered_section_heading(2, "SKILL FORGE", variant="blue")
+    voice_forge_config = replace(
+        VOICE_FORGE_CONFIG,
+        on_challenge_complete=_make_voice_challenge_complete_handler(progress),
+    )
     render_skill_forge(
         progress,
         google_sub=google_sub,
         challenge_codes=challenge_codes,
         challenge_stdout=challenge_stdout,
+        config=voice_forge_config,
     )
 
     render_numbered_section_heading(3, "🧪 FORGE LAB", variant="green")
@@ -273,18 +355,6 @@ def render_level(progress: DungeonProgress) -> str:
                 result = run_forge_lab_code(code)
                 if result.ok:
                     if google_sub is not None:
-                        from agent_dungeon.forge.agent_py_store import (
-                            ensure_agent_py,
-                            write_module_section,
-                        )
-
-                        ensure_agent_py(google_sub, progress=progress)
-                        write_module_section(
-                            google_sub,
-                            "voice",
-                            code if str(code).strip() else DEFAULT_LAB_CODE,
-                            progress=progress,
-                        )
                         mark_forge_lab_complete(progress)
                         save_user_progress(google_sub, progress)
                     st.session_state[STDOUT_KEY] = result.stdout.strip()
@@ -322,7 +392,13 @@ def render_level(progress: DungeonProgress) -> str:
             except Exception as exc:
                 st.warning(f"延伸技能面板載入失敗：{exc}")
 
-    _persist_voice_page_data(google_sub, page_data, progress, lab_done=lab_done)
+    _persist_voice_page_data(
+        google_sub,
+        page_data,
+        progress,
+        lab_done=lab_done,
+        challenge_codes=challenge_codes,
+    )
 
     preview_codes = dict(challenge_codes)
     stored_challenges = page_data.get("challenges")
@@ -334,9 +410,17 @@ def render_level(progress: DungeonProgress) -> str:
             raw = str(st.session_state[code_key]).strip()
             if raw:
                 preview_codes[challenge.id] = str(st.session_state[code_key])
+    preview_agent_py_path: str | None = None
+    if google_sub is not None and any(
+        challenge_complete(progress, challenge.id) for challenge in VOICE_FORGE_CHALLENGES
+    ):
+        from agent_dungeon.forge.agent_py_store import agent_py_path as resolve_agent_py_path
+
+        preview_agent_py_path = str(resolve_agent_py_path(google_sub))
     st.session_state["agent_column_preview"] = {
         "challenge_codes": preview_codes,
-        "lab_code": lab_code,
+        "lab_code": "",
+        "agent_py_path": preview_agent_py_path,
     }
 
     return build_dungeon_extra_context(

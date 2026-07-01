@@ -11,6 +11,7 @@ from agent_dungeon.core.progress import (
     challenge_complete,
     voice_module_online,
 )
+from agent_dungeon.forge.agent_py_store import normalize_to_main_function
 from agent_dungeon.forge.challenges import (
     brain_challenge_codes_from_stored,
     challenge_codes_from_stored,
@@ -65,8 +66,6 @@ def _best_main_body(
                 return raw
 
     if voice_module_online(progress):
-        if lab_code.strip():
-            return lab_code.strip()
         for cid in ("c3", "c2", "c1"):
             raw = challenge_codes.get(cid, "").strip()
             if raw:
@@ -106,14 +105,16 @@ def build_agent_py_preview(
     brain_codes = brain_challenge_codes or brain_challenge_codes_from_stored(None)
     loop_codes = loop_challenge_codes or loop_challenge_codes_from_stored(None)
 
-    main_body = _best_main_body(
-        progress,
-        challenge_codes=voice_codes,
-        lab_code=lab_code,
-        brain_challenge_codes=brain_codes,
-        brain_lab_code=brain_lab_code,
-        loop_challenge_codes=loop_codes,
-        loop_lab_code=loop_lab_code,
+    main_body = normalize_to_main_function(
+        _best_main_body(
+            progress,
+            challenge_codes=voice_codes,
+            lab_code=lab_code,
+            brain_challenge_codes=brain_codes,
+            brain_lab_code=brain_lab_code,
+            loop_challenge_codes=loop_codes,
+            loop_lab_code=loop_lab_code,
+        )
     )
 
     voice_marker = _VOICE_SECTION if voice_module_online(progress) or any(

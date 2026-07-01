@@ -27,11 +27,17 @@ def test_preview_grows_with_c1() -> None:
     assert "# 🔒 完成 Skill Forge 解鎖" not in preview
 
 
-def test_preview_uses_lab_code_when_voice_online() -> None:
+def test_preview_uses_c3_not_lab_code_when_voice_online() -> None:
     progress = DungeonProgress()
     mark_forge_challenge_complete(progress, "c1")
     mark_forge_challenge_complete(progress, "c2")
     mark_forge_challenge_complete(progress, "c3")
+    c3_code = """def main():
+    print("Hello")
+
+if __name__ == "__main__":
+    main()
+"""
     lab = """def main():
     print("Hi there!")
     print("I am ready.")
@@ -39,8 +45,27 @@ def test_preview_uses_lab_code_when_voice_online() -> None:
     mark_forge_lab_complete(progress)
     preview = build_agent_py_preview(
         progress,
-        challenge_codes={"c3": 'print("old")'},
+        challenge_codes={"c3": c3_code},
         lab_code=lab,
     )
-    assert "Hi there!" in preview
-    assert 'print("old")' not in preview
+    assert 'print("Hello")' in preview
+    assert "Hi there!" not in preview
+
+
+def test_preview_strips_nested_if_name_in_main_body() -> None:
+    from agent_dungeon.forge.challenges import _VOICE_C3_LEGACY_IF_NAME
+
+    progress = DungeonProgress()
+    mark_forge_challenge_complete(progress, "c1")
+    mark_forge_challenge_complete(progress, "c2")
+    polluted = f"""def main():
+    print("Hello")
+{_VOICE_C3_LEGACY_IF_NAME}
+"""
+    preview = build_agent_py_preview(
+        progress,
+        challenge_codes={"c2": polluted, "c3": polluted},
+    )
+    assert preview.count('if __name__ == "__main__":') == 1
+    assert "    if __name__" not in preview
+    assert 'print("Hello")' in preview
