@@ -5,6 +5,7 @@ from agent_dungeon.forge.challenges import (
     EMPTY_FORGE_LAB_CODE,
     VOICE_LEGACY_LAB_CODE,
     resolve_stored_lab_code,
+    voice_forge_lab_seed_code,
 )
 
 
@@ -62,3 +63,15 @@ def test_resolve_keeps_custom_code_after_lab_complete() -> None:
         resolve_stored_lab_code(custom, legacy=VOICE_LEGACY_LAB_CODE, lab_done=True)
         == custom
     )
+
+
+def test_voice_forge_lab_seed_has_hint_not_second_print() -> None:
+    c3 = """def main():
+    print("Hello")
+
+if __name__ == "__main__":
+    main()
+"""
+    seed = voice_forge_lab_seed_code({"c3": c3})
+    assert "再加一句自我介紹" in seed
+    assert seed.count('print("Hello")') == 1

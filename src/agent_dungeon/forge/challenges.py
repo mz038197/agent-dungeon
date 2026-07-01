@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+import ast
 from dataclasses import dataclass
 
-from agent_dungeon.forge.code_checks import has_brain_constructor, has_input_call
+from agent_dungeon.forge.code_checks import (
+    has_brain_constructor,
+    has_input_call,
+    has_main_call_in_main_guard,
+)
 from agent_dungeon.forge.llm_provider import DEFAULT_BRAIN_MODEL
 
 CHALLENGE_IDS = ("c1", "c2", "c3")
@@ -27,23 +32,42 @@ class ForgeChallenge:
 
 
 _VOICE_C2_HINT = """# --- 本關：建立 main() ---
-# 提示：用 def 定義函式，把上一關的 print 放進去"""
+# 提示：用 def 定義函式，把上一關的 print 放進去
+# Code Here #"""
 
-_VOICE_C2_LEGACY_HINT = """# --- 本關：建立 main() ---
+_VOICE_C2_LEGACY_HINT = _VOICE_C2_HINT
+
+_VOICE_C2_LEGACY_SKELETON_HINT = """# --- 本關：建立 main() ---
 # def main():
 #     print("Hello")
 # Code Here #"""
 
+_VOICE_C2_LEGACY_HINT_OLD = _VOICE_C2_LEGACY_SKELETON_HINT
+
+_VOICE_C2_LEGACY_AUTO_WRAP = """def main():
+    # TODO: 用 print 輸出 Hello
+    # Code Here #
+    pass"""
+
 _VOICE_C3_SUFFIX = """if __name__ == "__main__":
+    # --- 本關：在這裡呼叫 main()，讓 Agent 說話 ---
+    # Code Here #"""
+
+_VOICE_C3_LEGACY_IF_NAME = """if __name__ == "__main__":
     # --- 本關：在這裡呼叫 main()，讓 Agent 說話 ---
     # main()
     # （記得把 main 內的輸出改成 Hello!）
     # Code Here #"""
 
-_VOICE_C3_STANDALONE = f"""def main():
-    pass
+_VOICE_C3_LEGACY_IF_NAME_V2 = """if __name__ == "__main__":
+    # --- 本關：啟動 main() ---
+    # 提示：呼叫 main()，並把 main 內輸出改成 Hello!"""
 
-{_VOICE_C3_SUFFIX}"""
+_VOICE_C3_LEGACY_MAIN_BODY_HINT = """    # TODO: 輸出 Hello!（記得驚嘆號）
+    # Code Here #"""
+
+_VOICE_LAB_HINT = """    # --- 本關：再加一句自我介紹 ---
+    # Code Here #"""
 
 VOICE_FORGE_CHALLENGES: tuple[ForgeChallenge, ...] = (
     ForgeChallenge(
@@ -58,14 +82,14 @@ VOICE_FORGE_CHALLENGES: tuple[ForgeChallenge, ...] = (
         label="Challenge 2",
         title="建立 main()",
         default_code=_VOICE_C2_HINT,
-        editor_hint="自己寫 `def main():`，把上一關的 print 放進函式裡",
+        editor_hint="自己寫 def main():，把上一關的 print 放進函式裡",
     ),
     ForgeChallenge(
         id="c3",
         label="Final Challenge",
         title="讓 Agent 說話！",
-        default_code=_VOICE_C3_STANDALONE.strip(),
-        editor_hint="在 `if __name__ == \"__main__\":` 區塊內呼叫 main()，並把 main 內輸出改成 Hello!",
+        default_code=_VOICE_C3_SUFFIX,
+        editor_hint='在 if __name__ == "__main__": 區塊內自己寫 main() 啟動程式',
     ),
 )
 
@@ -224,7 +248,52 @@ def _voice_legacy_stored_values(challenge_id: str) -> set[str]:
             values.add(raw.strip())
     if challenge_id == "c2":
         values.add(_VOICE_C2_LEGACY_HINT.strip())
+        values.add(_VOICE_C2_LEGACY_SKELETON_HINT.strip())
+        values.add(_VOICE_C2_LEGACY_HINT_OLD.strip())
+        values.add(_VOICE_C2_LEGACY_AUTO_WRAP.strip())
+    if challenge_id == "c3":
+        values.add(_VOICE_C3_LEGACY_IF_NAME.strip())
+        values.add(_VOICE_C3_LEGACY_IF_NAME_V2.strip())
+        values.add(_VOICE_C3_LEGACY_MAIN_BODY_HINT.strip())
     return values
+
+
+def _voice_c2_template_with_prior(prior_code: str) -> str:
+    hint = _VOICE_C2_HINT.strip()
+    prior = prior_code.strip()
+    if not prior:
+        return hint
+    return f"{hint}\n{prior}"
+
+
+def _voice_c2_stored_is_stale(stored: str, *, default: str) -> bool:
+    stripped = stored.strip()
+    if stripped == default.strip():
+        return False
+    if "# def main():" in stripped:
+        return True
+    if "# TODO: 用 print 輸出 Hello" in stripped:
+        return True
+    if any(line.strip() == '# print("Hello")' for line in stripped.splitlines()):
+        return True
+    hello_at = stripped.find('print("Hello")')
+    hint_at = stripped.find("本關")
+    if hello_at >= 0 and hint_at >= 0 and hello_at < hint_at:
+        return True
+    return False
+
+
+def _voice_c3_stored_is_stale(stored: str, *, default: str) -> bool:
+    stripped = stored.strip()
+    if stripped == default.strip():
+        return False
+    if "if __name__" not in stripped:
+        return False
+    if "# main()" in stripped:
+        return True
+    if "Hello!" in stripped:
+        return True
+    return False
 
 
 def _voice_stored_needs_carry_forward(
@@ -246,20 +315,62 @@ def _voice_stored_needs_carry_forward(
     if not completed and stripped in _voice_legacy_stored_values(challenge.id):
         return True
     if challenge.id == "c2":
-        if stripped == _VOICE_C2_LEGACY_HINT.strip():
+        if stripped in {
+            _VOICE_C2_LEGACY_HINT.strip(),
+            _VOICE_C2_LEGACY_SKELETON_HINT.strip(),
+            _VOICE_C2_LEGACY_HINT_OLD.strip(),
+            _VOICE_C2_LEGACY_AUTO_WRAP.strip(),
+        }:
             return True
-        if default.strip() != challenge.default_code.strip():
-            if "def main" not in stripped and "本關" in stripped and "print(" not in stripped:
+        if "# TODO: 用 print 輸出 Hello" in stripped and _voice_has_executable_main(stripped):
+            return True
+        if _voice_c2_stored_is_stale(stripped, default=default):
+            return True
+        if default.strip() != challenge.default_code.strip() and not _voice_has_executable_main(stripped):
+            if "本關" in stripped and "print(" not in stripped:
                 return True
         return False
     if challenge.id == "c3":
-        if "if __name__" in stripped:
-            return False
-        if default.strip().startswith(stripped.rstrip()) and "if __name__" in default:
+        if stripped in {
+            _VOICE_C3_LEGACY_IF_NAME.strip(),
+            _VOICE_C3_LEGACY_IF_NAME_V2.strip(),
+            _VOICE_C3_LEGACY_MAIN_BODY_HINT.strip(),
+        }:
             return True
-        if "本關" in stripped:
+        if _voice_c3_stored_is_stale(stripped, default=default):
+            return True
+        if default.strip().startswith(stripped.rstrip()) and stripped != default.strip():
+            return True
+        if "if __name__" in stripped and not _voice_has_executable_main(stripped):
+            return True
+        if _voice_has_executable_main(stripped) and "if __name__" not in stripped:
             return True
         return False
+    return False
+
+
+def _voice_has_executable_main(source: str) -> bool:
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return False
+    return any(
+        isinstance(node, ast.FunctionDef) and node.name == "main"
+        for node in tree.body
+    )
+
+
+def _voice_has_executable_module_code(source: str) -> bool:
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return False
+    for node in tree.body:
+        if isinstance(node, ast.FunctionDef):
+            continue
+        if isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant):
+            continue
+        return True
     return False
 
 
@@ -494,6 +605,58 @@ def challenge_code_for_persist(
     return default
 
 
+def voice_highest_challenge_code(challenge_codes: dict[str, str]) -> str:
+    for cid in ("c3", "c2", "c1"):
+        raw = challenge_codes.get(cid, "").strip()
+        if raw:
+            return raw
+    return ""
+
+
+def _extract_module_if_name_guard(source: str) -> str:
+    lines = source.splitlines()
+    for index, line in enumerate(lines):
+        if line.strip().startswith("if __name__"):
+            return "\n".join(lines[index:]).strip()
+    return _VOICE_C3_SUFFIX.strip()
+
+
+def _append_voice_lab_hint(source: str) -> str:
+    if "再加一句自我介紹" in source:
+        return source.strip()
+    from agent_dungeon.forge.agent_py_store import strip_if_name_guard_blocks
+
+    main_part = strip_if_name_guard_blocks(source.strip())
+    guard = _extract_module_if_name_guard(source)
+    if not main_part.strip():
+        return source.strip()
+
+    lines = main_part.splitlines()
+    insert_at = len(lines)
+    for index in range(len(lines) - 1, 0, -1):
+        line = lines[index]
+        if line.strip():
+            insert_at = index + 1
+            break
+    hint_lines = _VOICE_LAB_HINT.splitlines()
+    for offset, hint_line in enumerate(hint_lines):
+        lines.insert(insert_at + offset, hint_line)
+    return f"{'\n'.join(lines).rstrip()}\n\n{guard}"
+
+
+def voice_forge_lab_seed_code(challenge_codes: dict[str, str]) -> str:
+    c3 = challenge_codes.get("c3", "").strip()
+    if c3 and _voice_has_executable_main(c3) and has_main_call_in_main_guard(c3):
+        return _append_voice_lab_hint(c3)
+
+    c2 = challenge_codes.get("c2", "").strip()
+    if c2 and _voice_has_executable_main(c2):
+        base = f"{c2.rstrip()}\n\n{_VOICE_C3_SUFFIX.strip()}"
+        return _append_voice_lab_hint(base)
+
+    return ""
+
+
 def _carry_forward_voice_code(
     challenge: ForgeChallenge,
     *,
@@ -502,15 +665,16 @@ def _carry_forward_voice_code(
     prior = prior_code.strip()
     if not prior:
         return challenge.default_code
-    suffix = challenge.default_code.strip()
     if challenge.id == "c2":
-        if "def main" in prior:
+        if _voice_has_executable_main(prior):
             return prior
-        return f"{suffix}\n\n{prior}"
+        return _voice_c2_template_with_prior(prior)
     if challenge.id == "c3":
-        if "if __name__" in prior:
-            return prior
-        return f"{prior.rstrip()}\n\n{_VOICE_C3_SUFFIX.strip()}"
+        suffix = challenge.default_code.strip()
+        if _voice_has_executable_main(prior):
+            return f"{prior.rstrip()}\n\n{suffix}"
+        return challenge.default_code
+    suffix = challenge.default_code.strip()
     return f"{prior}\n\n{suffix}"
 
 
