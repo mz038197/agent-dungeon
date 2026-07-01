@@ -10,6 +10,7 @@ from agent_dungeon.core.progress import (
     DungeonProgress,
     ModuleStatus,
     brain_module_online,
+    voice_module_online,
 )
 from agent_dungeon.forge.forge_runtime.registry import build_platform_header
 
@@ -42,6 +43,36 @@ _MAIN_DEF_RE = re.compile(
     r"^def main\s*\([^)]*\)\s*:\s*\n(.*?)(?=^(?:def |if __name__|\Z))",
     re.MULTILINE | re.DOTALL,
 )
+
+_IF_NAME_LINE = re.compile(
+    r"^(\s*)if __name__\s*==\s*(['\"])__main__\2\s*:\s*$"
+)
+
+
+def strip_if_name_guard_blocks(code: str) -> str:
+    """移除所有 if __name__ == '__main__': 區塊（學員不應在編輯器撰寫）。"""
+    lines = code.splitlines()
+    result: list[str] = []
+    i = 0
+    while i < len(lines):
+        match = _IF_NAME_LINE.match(lines[i])
+        if match:
+            base_indent = len(match.group(1))
+            i += 1
+            while i < len(lines):
+                line = lines[i]
+                if not line.strip():
+                    i += 1
+                    continue
+                indent = len(line) - len(line.lstrip())
+                if indent > base_indent:
+                    i += 1
+                    continue
+                break
+            continue
+        result.append(lines[i])
+        i += 1
+    return "\n".join(result).rstrip()
 
 
 def agent_py_path(google_sub: str) -> Path:
@@ -76,16 +107,10 @@ def get_module_section(source: str, module: ModuleName) -> str:
 
 def normalize_to_main_function(code: str) -> str:
     """將編輯器內容正規化為含 def main(): 的完整函式（不含 if __name__）。"""
-    text = code.strip()
+    text = strip_if_name_guard_blocks(code.strip())
     if not text:
         return "def main():\n    pass"
     if re.search(r"^def main\s*\(", text, re.MULTILINE):
-        text = re.sub(
-            r"\nif __name__ == ['\"]__main__['\"]:.*\Z",
-            "",
-            text,
-            flags=re.DOTALL,
-        ).rstrip()
         return text
     indented = "\n".join(f"    {line}" if line.strip() else "" for line in text.splitlines())
     return f"def main():\n{indented}"
@@ -122,7 +147,7 @@ def read_agent_main_body(google_sub: str | None, *, progress: DungeonProgress | 
         return "def main():\n    pass"
     migrate_page_data_to_agent_py(google_sub, progress=progress or DungeonProgress())
     path = agent_py_path(google_sub)
-    return extract_agent_main_source(read_agent_py(path))
+    return normalize_to_main_function(extract_agent_main_source(read_agent_py(path)))
 
 
 def _marker_lines() -> str:
@@ -155,6 +180,46 @@ def ensure_agent_py(google_sub: str, *, progress: DungeonProgress | None = None)
     if not path.is_file():
         write_agent_py(path, build_agent_py_template(progress=progress))
     return path
+
+
+def _voice_challenge_code_from_page_data(page_data: dict) -> str:
+    challenges = page_data.get("challenges")
+    if not isinstance(challenges, dict):
+        return ""
+    for cid in ("c3", "c2", "c1"):
+        raw = challenges.get(cid)
+        if isinstance(raw, str) and raw.strip():
+            return raw.strip()
+    return ""
+
+
+def sync_voice_forge_challenge_to_agent_py(
+    google_sub: str,
+    code: str,
+    *,
+    progress: DungeonProgress,
+) -> Path:
+    ensure_agent_py(google_sub, progress=progress)
+    return write_agent_main_body(google_sub, code, progress=progress)
+
+
+def backfill_voice_forge_to_agent_py(
+    google_sub: str,
+    challenge_codes: dict[str, str],
+    *,
+    progress: DungeonProgress,
+) -> Path | None:
+    from agent_dungeon.forge.challenges import voice_highest_challenge_code
+
+    path = agent_py_path(google_sub)
+    if path.is_file():
+        main = extract_agent_main_source(read_agent_py(path))
+        if main.strip() != "def main():\n    pass":
+            return None
+    code = voice_highest_challenge_code(challenge_codes)
+    if not code.strip():
+        return None
+    return sync_voice_forge_challenge_to_agent_py(google_sub, code, progress=progress)
 
 
 def write_agent_main_body(
@@ -216,7 +281,7 @@ def migrate_page_data_to_agent_py(google_sub: str, *, progress: DungeonProgress)
     if not main_source.strip() and brain_data and brain_module_online(progress):
         main_source = _latest_challenge_code(brain_data, "brain") or str(brain_data.get("code") or "")
     if not main_source.strip() and voice_data and voice_module_online(progress):
-        main_source = _latest_challenge_code(voice_data, "voice") or str(voice_data.get("code") or "")
+        main_source = _voice_challenge_code_from_page_data(voice_data)
 
     if main_source.strip():
         write_agent_main_body(google_sub, main_source, progress=progress)
