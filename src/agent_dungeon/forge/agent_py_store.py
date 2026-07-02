@@ -12,6 +12,7 @@ from agent_dungeon.core.progress import (
     brain_module_online,
     voice_module_online,
 )
+from agent_dungeon.forge.forge_sanitize import strip_comments_from_source
 from agent_dungeon.forge.forge_runtime.registry import build_platform_header
 
 ModuleName = Literal["voice", "brain", "loop"]
@@ -143,7 +144,9 @@ def extract_agent_main_source(source: str) -> str:
 def read_agent_main_body(google_sub: str | None, *, progress: DungeonProgress | None = None) -> str:
     if google_sub is None:
         return "def main():\n    pass"
-    migrate_page_data_to_agent_py(google_sub, progress=progress or DungeonProgress())
+    progress = progress or DungeonProgress()
+    migrate_page_data_to_agent_py(google_sub, progress=progress)
+    sanitize_agent_py_if_needed(google_sub, progress=progress)
     path = agent_py_path(google_sub)
     return normalize_to_main_function(extract_agent_main_source(read_agent_py(path)))
 
@@ -232,8 +235,26 @@ def write_agent_main_body(
     progress: DungeonProgress | None = None,
 ) -> Path:
     path = ensure_agent_py(google_sub, progress=progress)
-    write_agent_py(path, build_agent_py_from_main(main_source, progress=progress))
+    clean = strip_comments_from_source(main_source)
+    write_agent_py(path, build_agent_py_from_main(clean, progress=progress))
     return path
+
+
+def sanitize_agent_py_if_needed(
+    google_sub: str,
+    *,
+    progress: DungeonProgress | None = None,
+) -> Path:
+    """進入關卡時：若 main() 含整行 # 註解，重寫為無註解版本。"""
+    progress = progress or DungeonProgress()
+    path = ensure_agent_py(google_sub, progress=progress)
+    from agent_dungeon.forge.forge_sanitize import agent_py_source_has_main_comments
+
+    source = read_agent_py(path)
+    if not agent_py_source_has_main_comments(source):
+        return path
+    main_body = extract_agent_main_source(source)
+    return write_agent_main_body(google_sub, main_body, progress=progress)
 
 
 def sync_main_entry(google_sub: str, *, progress: DungeonProgress) -> None:
@@ -241,7 +262,7 @@ def sync_main_entry(google_sub: str, *, progress: DungeonProgress) -> None:
     path = ensure_agent_py(google_sub, progress=progress)
     source = read_agent_py(path)
     main_body = extract_agent_main_source(source)
-    write_agent_py(path, build_agent_py_from_main(main_body, progress=progress))
+    write_agent_main_body(google_sub, main_body, progress=progress)
 
 
 def _load_page_json(path: Path) -> dict:
