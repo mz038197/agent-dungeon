@@ -353,3 +353,29 @@ def render_agent_terminal(
         )
 
     return get_terminal_session(session_key)
+
+
+_FORGE_INLINE_CAPTION = "按執行後，在執行結果框內 prompt 後輸入；Enter 送出。⏹ 可強制結束。"
+
+
+def render_forge_inline_terminal(
+    *,
+    session_key: str,
+    agent_py: Path,
+    google_sub: str,
+    disabled: bool = False,
+) -> AgentTerminalSession | None:
+    """Forge Skill Forge / Lab 共用 inline terminal（與 Brain C1 同款）。"""
+    return render_agent_terminal(
+        session_key=session_key,
+        agent_py=agent_py,
+        google_sub=google_sub,
+        disabled=disabled,
+        start_button_label="▶ 執行",
+        stop_button_label="⏹ 結束",
+        title="執行結果",
+        caption_text=_FORGE_INLINE_CAPTION,
+        input_mode="form",
+        show_turn_count=False,
+        layout="inline",
+    )
