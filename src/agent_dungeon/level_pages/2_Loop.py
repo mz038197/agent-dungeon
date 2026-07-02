@@ -48,11 +48,13 @@ from agent_dungeon.forge.challenges import (
     challenge_code_for_persist,
     forge_editor_code_needs_refresh,
     loop_challenge_codes_from_stored,
+    merge_loop_challenge_stored_with_session,
     resolve_stored_lab_code,
 )
 from agent_dungeon.forge.forge_terminal_ui import render_forge_inline_terminal
 from agent_dungeon.forge.loop_skill_forge_ui import render_loop_skill_forge
 from agent_dungeon.forge.loop_validator import validate_loop_forge_lab
+from agent_dungeon.forge.skill_forge_ui import sync_active_forge_session_to_agent_py
 from agent_dungeon.ui.dungeon_shell import dungeon_shell
 from agent_dungeon.ui.mission_complete_ui import render_mission_complete_banner
 from agent_dungeon.ui.section_heading_ui import render_level_heading, render_numbered_section_heading
@@ -100,6 +102,18 @@ def _brain_seed(google_sub: str, progress: DungeonProgress) -> str:
     return read_agent_main_body(google_sub, progress=progress)
 
 
+def _loop_session_code_overrides() -> dict[str, str]:
+    overrides: dict[str, str] = {}
+    for challenge in LOOP_FORGE_CHALLENGES:
+        key = f"loop_forge_{challenge.id}_code"
+        if key not in st.session_state:
+            continue
+        raw = str(st.session_state[key])
+        if raw.strip():
+            overrides[challenge.id] = raw
+    return overrides
+
+
 def _challenge_codes_from_state(
     page_data: dict,
     progress: DungeonProgress,
@@ -111,9 +125,14 @@ def _challenge_codes_from_state(
         challenge.id: challenge_complete(progress, challenge.id, level_id=LOOP_LEVEL_ID)
         for challenge in LOOP_FORGE_CHALLENGES
     }
+    merged = merge_loop_challenge_stored_with_session(
+        stored if isinstance(stored, dict) else None,
+        session_overrides=_loop_session_code_overrides(),
+        completed=completed,
+    )
     brain_seed = _brain_seed(google_sub, progress) if google_sub else ""
     return loop_challenge_codes_from_stored(
-        stored if isinstance(stored, dict) else None,
+        merged,
         completed=completed,
         brain_seed=brain_seed,
     )
@@ -242,7 +261,6 @@ def render_level(progress: DungeonProgress) -> str:
     if google_sub is not None:
         migrate_page_data_to_agent_py(google_sub, progress=progress)
         ensure_agent_py(google_sub, progress=progress)
-        sanitize_agent_py_if_needed(google_sub, progress=progress)
 
     lab_done = loop_module_online(progress)
     forge_done = skill_forge_complete(progress, level_id=LOOP_LEVEL_ID)
@@ -298,6 +316,16 @@ def render_level(progress: DungeonProgress) -> str:
         )
     else:
         render_dungeon_hint("請先登入以使用 Skill Forge。")
+
+    if google_sub is not None and not loop_module_online(progress):
+        sync_active_forge_session_to_agent_py(
+            progress,
+            google_sub=google_sub,
+            key_prefix="loop_forge",
+            challenges=LOOP_FORGE_CHALLENGES,
+            level_id=LOOP_LEVEL_ID,
+        )
+        sanitize_agent_py_if_needed(google_sub, progress=progress)
 
     render_numbered_section_heading(3, "🧪 FORGE LAB", variant="green")
     with st.container(border=True):

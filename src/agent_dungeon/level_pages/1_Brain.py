@@ -43,6 +43,7 @@ from agent_dungeon.forge.agent_py_store import (
     write_module_section,
 )
 from agent_dungeon.forge.brain_skill_forge_ui import render_brain_skill_forge
+from agent_dungeon.forge.skill_forge_ui import sync_active_forge_session_to_agent_py
 from agent_dungeon.forge.brain_validator import validate_brain_forge_lab
 from agent_dungeon.forge.forge_session import clear_forge_level_session
 from agent_dungeon.forge.forge_terminal_ui import render_forge_inline_terminal
@@ -346,7 +347,6 @@ def render_level(progress: DungeonProgress) -> str:
     if google_sub is not None:
         migrate_page_data_to_agent_py(google_sub, progress=progress)
         ensure_agent_py(google_sub, progress=progress)
-        sanitize_agent_py_if_needed(google_sub, progress=progress)
         st.session_state["agent_column_preview"] = {
             "agent_py_path": str(agent_file),
             "google_sub": google_sub,
@@ -403,6 +403,16 @@ def render_level(progress: DungeonProgress) -> str:
         )
     else:
         render_dungeon_hint("請先登入以使用 Skill Forge。")
+
+    if google_sub is not None and not brain_module_online(progress):
+        sync_active_forge_session_to_agent_py(
+            progress,
+            google_sub=google_sub,
+            key_prefix="brain_forge",
+            challenges=BRAIN_FORGE_CHALLENGES,
+            level_id=BRAIN_LEVEL_ID,
+        )
+        sanitize_agent_py_if_needed(google_sub, progress=progress)
 
     render_numbered_section_heading(3, "🧪 FORGE LAB", variant="green")
     with st.container(border=True):

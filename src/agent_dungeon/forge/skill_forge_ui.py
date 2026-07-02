@@ -147,6 +147,54 @@ def _challenge_unlocked(
     return False
 
 
+def active_forge_session_code(
+    progress: DungeonProgress,
+    *,
+    key_prefix: str,
+    challenges: tuple[ForgeChallenge, ...],
+    level_id: str,
+) -> str:
+    """取目前進行中（或最後已完成）關卡的 session 編輯器內容。"""
+    fallback = ""
+    for challenge in challenges:
+        if not _challenge_unlocked(
+            progress,
+            challenge,
+            level_id=level_id,
+            challenges=challenges,
+        ):
+            break
+        key = f"{key_prefix}_{challenge.id}_code"
+        raw = str(st.session_state.get(key, "")).strip()
+        if not raw:
+            continue
+        if challenge_complete(progress, challenge.id, level_id=level_id):
+            fallback = raw
+            continue
+        return raw
+    return fallback
+
+
+def sync_active_forge_session_to_agent_py(
+    progress: DungeonProgress,
+    *,
+    google_sub: str,
+    key_prefix: str,
+    challenges: tuple[ForgeChallenge, ...],
+    level_id: str,
+) -> None:
+    from agent_dungeon.forge.agent_py_store import write_agent_main_body
+
+    code = active_forge_session_code(
+        progress,
+        key_prefix=key_prefix,
+        challenges=challenges,
+        level_id=level_id,
+    )
+    if code.strip():
+        write_agent_main_body(google_sub, code, progress=progress)
+
+
 def _forge_progress(
     progress: DungeonProgress,
     *,
