@@ -38,6 +38,7 @@ from agent_dungeon.forge.agent_py_store import (
     migrate_page_data_to_agent_py,
     read_agent_main_body,
     read_module_for_editor,
+    sanitize_agent_py_if_needed,
     write_loop_module_body,
 )
 from agent_dungeon.forge.challenges import (
@@ -241,6 +242,7 @@ def render_level(progress: DungeonProgress) -> str:
     if google_sub is not None:
         migrate_page_data_to_agent_py(google_sub, progress=progress)
         ensure_agent_py(google_sub, progress=progress)
+        sanitize_agent_py_if_needed(google_sub, progress=progress)
 
     lab_done = loop_module_online(progress)
     forge_done = skill_forge_complete(progress, level_id=LOOP_LEVEL_ID)
@@ -252,10 +254,11 @@ def render_level(progress: DungeonProgress) -> str:
 
     agent_file = agent_py_path(google_sub) if google_sub else None
 
-    preview_state = dict(st.session_state.get("agent_column_preview") or {})
     if google_sub is not None:
-        preview_state["agent_py_path"] = str(agent_file)
-    st.session_state["agent_column_preview"] = preview_state
+        st.session_state["agent_column_preview"] = {
+            "agent_py_path": str(agent_file),
+            "google_sub": google_sub,
+        }
 
     render_level_heading(3, LOOP_LEVEL_SUBTITLE)
 

@@ -273,12 +273,15 @@ def render_level(progress: DungeonProgress) -> str:
     _sync_forge_code_session(challenge_codes, progress)
     if google_sub is not None:
         from agent_dungeon.forge.agent_py_store import (
+            agent_py_path as resolve_agent_py_path,
             backfill_voice_forge_to_agent_py,
             rewrite_agent_py_without_module_markers,
+            sanitize_agent_py_if_needed,
         )
 
         rewrite_agent_py_without_module_markers(google_sub, progress=progress)
         backfill_voice_forge_to_agent_py(google_sub, challenge_codes, progress=progress)
+        sanitize_agent_py_if_needed(google_sub, progress=progress)
     challenge_stdout = _challenge_stdout_from_state(page_data)
     lab_code = _lab_code_from_state(
         page_data,
@@ -404,28 +407,13 @@ def render_level(progress: DungeonProgress) -> str:
         challenge_codes=challenge_codes,
     )
 
-    preview_codes = dict(challenge_codes)
-    stored_challenges = page_data.get("challenges")
-    if isinstance(stored_challenges, dict):
-        preview_codes.update(stored_challenges)
-    for challenge in VOICE_FORGE_CHALLENGES:
-        code_key = f"voice_forge_{challenge.id}_code"
-        if code_key in st.session_state:
-            raw = str(st.session_state[code_key]).strip()
-            if raw:
-                preview_codes[challenge.id] = str(st.session_state[code_key])
-    preview_agent_py_path: str | None = None
-    if google_sub is not None and any(
-        challenge_complete(progress, challenge.id) for challenge in VOICE_FORGE_CHALLENGES
-    ):
+    if google_sub is not None:
         from agent_dungeon.forge.agent_py_store import agent_py_path as resolve_agent_py_path
 
-        preview_agent_py_path = str(resolve_agent_py_path(google_sub))
-    st.session_state["agent_column_preview"] = {
-        "challenge_codes": preview_codes,
-        "lab_code": "",
-        "agent_py_path": preview_agent_py_path,
-    }
+        st.session_state["agent_column_preview"] = {
+            "agent_py_path": str(resolve_agent_py_path(google_sub)),
+            "google_sub": google_sub,
+        }
 
     return build_dungeon_extra_context(
         progress,
