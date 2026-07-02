@@ -42,7 +42,7 @@ BRAIN_FORGE_CONFIG = SkillForgeConfig(
     reward_pending="完成三關 Skill Forge 後顯示獎勵",
 )
 
-_BRAIN_TERMINAL_CAPTION = "按執行後，在下方輸入；Enter 送出。⏹ 可強制結束。"
+_BRAIN_TERMINAL_CAPTION = "按執行後，在執行結果框內 prompt 後輸入；Enter 送出。⏹ 可強制結束。"
 
 
 def _sync_brain_to_agent_py(
@@ -117,6 +117,7 @@ def _render_brain_challenge_card(
                 caption_text=_BRAIN_TERMINAL_CAPTION,
                 input_mode="form",
                 show_turn_count=False,
+                layout="inline" if challenge.id == "c1" else "split",
             )
 
         if not done and st.button(
