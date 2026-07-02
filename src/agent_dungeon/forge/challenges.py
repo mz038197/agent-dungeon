@@ -151,8 +151,9 @@ BRAIN_LEGACY_LAB_CODE = f"""def main():
 """.strip()
 
 _LOOP_C1_HINT = """    # --- 本關：用 while True 包住下方 input 起的對話邏輯 ---
-    # while True:
     # Code Here #"""
+
+_LOOP_C1_HINT_MARKER = "while True 包住"
 
 _LOOP_C2_HINT = """        # --- 本關：bye 離開 ---
         # if question == "bye":
@@ -473,6 +474,8 @@ def _brain_stored_needs_carry_forward(
     if not completed and stripped == legacy.get(challenge.id, "").strip():
         return True
     if challenge.id == "c1" and stripped == _BRAIN_C1_LEGACY_STARTER:
+        return True
+    if challenge.id == "c1" and _loop_c1_hint_misplaced(stripped):
         return True
     if challenge.id == "c2" and stripped == _BRAIN_C2_LEGACY_ANSWER.strip():
         return True
@@ -884,13 +887,71 @@ def brain_challenge_codes_from_stored(
     return codes
 
 
-def _loop_c1_from_brain_seed(brain_seed: str) -> str:
-    seed = brain_seed.strip()
+def _strip_loop_c1_hint(source: str) -> str:
+    lines = source.splitlines()
+    kept: list[str] = []
+    index = 0
+    while index < len(lines):
+        line = lines[index]
+        if _LOOP_C1_HINT_MARKER in line:
+            while index < len(lines) and "Code Here" not in lines[index]:
+                index += 1
+            if index < len(lines):
+                index += 1
+            continue
+        kept.append(line)
+        index += 1
+    return "\n".join(kept).rstrip()
+
+
+def _loop_c1_hint_misplaced(source: str) -> bool:
+    stripped = source.strip()
+    if _LOOP_C1_HINT_MARKER not in stripped:
+        return False
+    hint_at = stripped.find("本關")
+    if hint_at < 0:
+        return False
+    llm_at = stripped.find("llm = Brain")
+    input_at = stripped.find("input(")
+    if llm_at >= 0 and hint_at < llm_at:
+        return True
+    if input_at >= 0 and hint_at > input_at:
+        return True
+    return False
+
+
+def _insert_loop_c1_hint_after_llm(source: str) -> str:
+    seed = _strip_loop_c1_hint(source.strip())
     if not seed:
         return f"def main():\n{_LOOP_C1_HINT}"
     if "def main" not in seed:
         seed = f"def main():\n{seed}"
-    return f"{seed.rstrip()}\n{_LOOP_C1_HINT}"
+
+    lines = seed.splitlines()
+    insert_at: int | None = None
+    for index, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped.startswith("llm = Brain(") or (
+            stripped.startswith("llm") and "Brain(" in stripped
+        ):
+            insert_at = index + 1
+            break
+    if insert_at is None:
+        for index, line in enumerate(lines):
+            if line.strip().startswith("def main"):
+                insert_at = index + 1
+                break
+    if insert_at is None:
+        return f"{seed.rstrip()}\n{_LOOP_C1_HINT}"
+
+    hint_lines = _LOOP_C1_HINT.splitlines()
+    for offset, hint_line in enumerate(hint_lines):
+        lines.insert(insert_at + offset, hint_line)
+    return "\n".join(lines)
+
+
+def _loop_c1_from_brain_seed(brain_seed: str) -> str:
+    return _insert_loop_c1_hint_after_llm(brain_seed)
 
 
 def _carry_forward_loop_code(
@@ -902,7 +963,7 @@ def _carry_forward_loop_code(
     prior = prior_code.strip()
     if challenge.id == "c1":
         if prior:
-            return f"{prior.rstrip()}\n{challenge.default_code.strip()}"
+            return _insert_loop_c1_hint_after_llm(prior)
         return _loop_c1_from_brain_seed(brain_seed)
     if not prior:
         return _loop_c1_from_brain_seed(brain_seed)
