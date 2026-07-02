@@ -25,6 +25,11 @@ LayoutMode = Literal["split", "inline"]
 
 _PROMPT_KEY = "forge_terminal_pending_prompt"
 _AWAITING_KEY = "forge_terminal_awaiting_input"
+_PROCESSING_KEY = "forge_terminal_processing"
+_OUTPUT_SNAPSHOT_KEY = "forge_terminal_output_snapshot"
+_PROCESSING_PROMPT_KEY = "forge_terminal_processing_prompt"
+
+_PROCESSING_PLACEHOLDER = "Brain 思考中…"
 
 _INLINE_TERMINAL_CSS = """
 <style>
@@ -50,6 +55,28 @@ def _session_state_key(base: str, session_key: str) -> str:
     return f"{session_key}_{base}"
 
 
+def should_exit_processing(stdout: str, snapshot_len: int, *, running: bool) -> bool:
+    """送出 input 後，snapshot 之後出現換行或 process 結束即離開 processing。"""
+    if not running:
+        return True
+    if snapshot_len < 0:
+        return False
+    if len(stdout) <= snapshot_len:
+        return False
+    return "\n" in stdout[snapshot_len:]
+
+
+def poll_interval_for_terminal(
+    *,
+    processing: bool,
+    awaiting_input: bool,
+    running: bool,
+) -> float | None:
+    if processing or (running and not awaiting_input):
+        return 0.2
+    return None
+
+
 def get_terminal_session(session_key: str) -> AgentTerminalSession | None:
     raw = st.session_state.get(_session_state_key(_SESSION_KEY, session_key))
     return raw if isinstance(raw, AgentTerminalSession) else None
@@ -63,6 +90,9 @@ def clear_terminal_session(session_key: str) -> None:
     st.session_state.pop(_session_state_key(_OUTPUT_KEY, session_key), None)
     st.session_state.pop(_session_state_key(_PROMPT_KEY, session_key), None)
     st.session_state.pop(_session_state_key(_AWAITING_KEY, session_key), None)
+    st.session_state.pop(_session_state_key(_PROCESSING_KEY, session_key), None)
+    st.session_state.pop(_session_state_key(_OUTPUT_SNAPSHOT_KEY, session_key), None)
+    st.session_state.pop(_session_state_key(_PROCESSING_PROMPT_KEY, session_key), None)
 
 
 def _refresh_terminal_output(session_key: str, session: AgentTerminalSession | None) -> str:
@@ -78,8 +108,16 @@ def _submit_terminal_input(
     session_key: str,
     line: str,
 ) -> None:
+    prompt_key = _session_state_key(_PROMPT_KEY, session_key)
+    processing_prompt_key = _session_state_key(_PROCESSING_PROMPT_KEY, session_key)
+    st.session_state[processing_prompt_key] = str(st.session_state.get(prompt_key, ""))
     send_input(session, line)
     st.session_state[_session_state_key(_AWAITING_KEY, session_key)] = False
+    st.session_state[prompt_key] = ""
+    st.session_state[_session_state_key(_PROCESSING_KEY, session_key)] = True
+    st.session_state[_session_state_key(_OUTPUT_SNAPSHOT_KEY, session_key)] = len(
+        session.stdout_buffer
+    )
     st.rerun()
 
 
@@ -127,6 +165,7 @@ def _render_prompt_input_inline(
     session: AgentTerminalSession,
     prompt: str,
     disabled: bool,
+    placeholder: str = "在此輸入…",
 ) -> None:
     input_disabled = disabled or not is_running(session)
 
@@ -142,20 +181,20 @@ def _render_prompt_input_inline(
                     key=f"{session_key}_input_line",
                     disabled=input_disabled,
                     label_visibility="collapsed",
-                    placeholder="在此輸入…",
+                    placeholder=placeholder,
                 )
         else:
             line = st.text_input(
                 "輸入",
                 key=f"{session_key}_input_line",
                 disabled=input_disabled,
-                placeholder="輸入後按 Enter 送出",
+                placeholder=placeholder,
                 label_visibility="collapsed",
             )
         submitted = st.form_submit_button("送出", disabled=input_disabled)
     st.markdown("</div>", unsafe_allow_html=True)
 
-    if submitted and str(line).strip():
+    if submitted and str(line).strip() and not input_disabled:
         _submit_terminal_input(session, session_key=session_key, line=str(line))
 
 
@@ -210,26 +249,48 @@ def _render_inline_terminal_panel(
     session = get_terminal_session(session_key)
     output = _refresh_terminal_output(session_key, session)
     running = session is not None and is_running(session)
-    completed, prompt = split_stdout_pending_prompt(output, awaiting_input=running)
 
     awaiting_key = _session_state_key(_AWAITING_KEY, session_key)
     prompt_key = _session_state_key(_PROMPT_KEY, session_key)
+    processing_key = _session_state_key(_PROCESSING_KEY, session_key)
+    snapshot_key = _session_state_key(_OUTPUT_SNAPSHOT_KEY, session_key)
+    processing_prompt_key = _session_state_key(_PROCESSING_PROMPT_KEY, session_key)
 
     if not running:
         st.session_state[awaiting_key] = False
         st.session_state[prompt_key] = ""
+        st.session_state[processing_key] = False
 
-    if running and prompt.strip():
+    processing = bool(st.session_state.get(processing_key, False))
+    if processing:
+        snapshot_len = int(st.session_state.get(snapshot_key, 0))
+        if should_exit_processing(output, snapshot_len, running=running):
+            st.session_state[processing_key] = False
+            st.session_state.pop(processing_prompt_key, None)
+            processing = False
+
+    split_awaiting = running and not processing
+    completed, prompt = split_stdout_pending_prompt(output, awaiting_input=split_awaiting)
+
+    if running and prompt.strip() and not processing:
         st.session_state[prompt_key] = prompt
         if not st.session_state.get(awaiting_key):
             st.session_state[awaiting_key] = True
             st.rerun()
-    elif running and not prompt.strip():
+    elif running and not prompt.strip() and not processing:
         st.session_state[awaiting_key] = False
 
-    awaiting_input = bool(running and st.session_state.get(awaiting_key) and prompt.strip())
-    poll_interval = None if awaiting_input else (0.2 if running else None)
+    awaiting_input = bool(
+        running and not processing and st.session_state.get(awaiting_key) and prompt.strip()
+    )
+    poll_interval = poll_interval_for_terminal(
+        processing=processing,
+        awaiting_input=awaiting_input,
+        running=running,
+    )
     display_prompt = str(st.session_state.get(prompt_key, ""))
+    if processing:
+        display_prompt = str(st.session_state.get(processing_prompt_key, display_prompt))
 
     with st.container(border=True):
         @st.fragment(run_every=poll_interval)
@@ -237,18 +298,37 @@ def _render_inline_terminal_panel(
             live_session = get_terminal_session(session_key)
             live_output = _refresh_terminal_output(session_key, live_session)
             live_running = live_session is not None and is_running(live_session)
+            live_processing = bool(st.session_state.get(processing_key, False))
+            if live_processing and live_session is not None:
+                live_snapshot = int(st.session_state.get(snapshot_key, 0))
+                if should_exit_processing(
+                    live_output,
+                    live_snapshot,
+                    running=live_running,
+                ):
+                    st.session_state[processing_key] = False
+                    st.session_state.pop(processing_prompt_key, None)
+                    live_processing = False
+
+            live_split_awaiting = live_running and not live_processing
             live_completed, live_prompt = split_stdout_pending_prompt(
                 live_output,
-                awaiting_input=live_running,
+                awaiting_input=live_split_awaiting,
             )
 
-            if live_running and live_prompt.strip():
+            if live_running and live_prompt.strip() and not live_processing:
                 st.session_state[prompt_key] = live_prompt
                 if not st.session_state.get(awaiting_key):
                     st.session_state[awaiting_key] = True
                     st.rerun()
 
-            if live_completed.strip():
+            if live_processing:
+                display = split_stdout_pending_prompt(live_output, awaiting_input=False)[0]
+                if display.strip():
+                    st.code(display.rstrip("\n"), language="text")
+                else:
+                    st.code("（等待 Brain 回覆…）", language="text")
+            elif live_completed.strip():
                 st.code(live_completed.rstrip("\n"), language="text")
             elif not live_running and not str(st.session_state.get(prompt_key, "")).strip():
                 st.code("（尚未啟動）", language="text")
@@ -256,12 +336,17 @@ def _render_inline_terminal_panel(
         _live_output()
 
         live_session = get_terminal_session(session_key)
-        if live_session is not None and is_running(live_session) and display_prompt.strip():
+        live_processing = bool(st.session_state.get(processing_key, False))
+        show_input = live_session is not None and is_running(live_session) and (
+            live_processing or display_prompt.strip()
+        )
+        if show_input:
             _render_prompt_input_inline(
                 session_key=session_key,
                 session=live_session,
-                prompt=display_prompt,
-                disabled=disabled,
+                prompt=display_prompt if display_prompt.strip() else "",
+                disabled=disabled or live_processing,
+                placeholder=_PROCESSING_PLACEHOLDER if live_processing else "在此輸入…",
             )
 
 
@@ -304,7 +389,10 @@ def render_agent_terminal(
         if session is not None and session.state == TerminalState.EXITED:
             st.caption(f"Agent 已結束（exit={session.exit_code}）")
         elif session is not None and is_running(session):
-            st.caption("執行中 · prompt 後輸入，Enter 送出")
+            if st.session_state.get(_session_state_key(_PROCESSING_KEY, session_key), False):
+                st.caption("執行中 · Brain 思考中…")
+            else:
+                st.caption("執行中 · prompt 後輸入，Enter 送出")
         return session
 
     output = str(st.session_state.get(_session_state_key(_OUTPUT_KEY, session_key), ""))
