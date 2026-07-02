@@ -236,8 +236,10 @@ def _render_prompt_input_inline(
 ) -> None:
     input_disabled = disabled or not is_running(session)
 
-    st.markdown('<div class="forge-terminal-input-block">', unsafe_allow_html=True)
-    st.markdown('<div class="forge-terminal-inline-form">', unsafe_allow_html=True)
+    st.markdown(
+        '<span data-forge-terminal-input="inline" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
     with st.form(key=f"{session_key}_inline_form", clear_on_submit=True, border=False):
         input_col, btn_col = st.columns([5, 1], gap="small", vertical_alignment="bottom")
         with input_col:
@@ -254,8 +256,6 @@ def _render_prompt_input_inline(
                 disabled=input_disabled,
                 use_container_width=True,
             )
-    st.markdown("</div>", unsafe_allow_html=True)
-    st.markdown("</div>", unsafe_allow_html=True)
 
     if submitted and str(line).strip() and not input_disabled:
         _submit_terminal_input(session, session_key=session_key, line=str(line))

@@ -1119,27 +1119,48 @@ _LIGHT_COLUMN_PAINT = """
         return;
       }
       const border = block.closest('[data-testid="stLayoutWrapper"]');
-      if (!border || border.querySelector('[data-testid="stHorizontalBlock"]')) {
+      if (!border) {
         return;
       }
       if (markerContainer) {
         collapseElementContainer(markerContainer);
       }
+      const inputMarkerContainer = block.querySelector(
+        ':scope > [data-testid="stElementContainer"]:has([data-forge-terminal-input="inline"])'
+      );
+      if (inputMarkerContainer) {
+        collapseElementContainer(inputMarkerContainer);
+      }
       border.style.paddingTop = "0px";
-      block.querySelectorAll('[data-testid="stTextInput"] input').forEach((input) => {
+      const form = block.querySelector('[data-testid="stForm"]');
+      if (!form) {
+        return;
+      }
+      form.querySelectorAll('[data-baseweb="input"]').forEach((shell) => {
+        const input = shell.querySelector("input");
+        const disabled = !!input?.disabled;
+        shell.style.setProperty("border-radius", "6px", "important");
+        if (disabled) {
+          shell.style.setProperty("background-color", "#0f172a", "important");
+          shell.style.setProperty("border", "1px solid #334155", "important");
+          shell.style.setProperty("box-shadow", "none", "important");
+          return;
+        }
+        shell.style.setProperty("background-color", "#f8fafc", "important");
+        shell.style.setProperty("border", "1px solid #94a3b8", "important");
+        shell.style.setProperty("box-shadow", "0 1px 2px rgba(15, 23, 42, 0.06)", "important");
+      });
+      form.querySelectorAll('[data-testid="stTextInput"] input').forEach((input) => {
+        input.style.setProperty("background-color", "transparent", "important");
+        input.style.setProperty("border", "none", "important");
+        input.style.setProperty("box-shadow", "none", "important");
         if (input.disabled) {
-          input.style.setProperty("background-color", "#0f172a", "important");
-          input.style.setProperty("border", "1px solid #334155", "important");
           input.style.setProperty("color", "#94a3b8", "important");
           return;
         }
-        input.style.setProperty("background-color", "#f8fafc", "important");
-        input.style.setProperty("border", "1px solid #94a3b8", "important");
-        input.style.setProperty("border-radius", "6px", "important");
         input.style.setProperty("color", "#0f172a", "important");
-        input.style.setProperty("box-shadow", "0 1px 2px rgba(15, 23, 42, 0.06)", "important");
       });
-      block.querySelectorAll('[data-testid="stFormSubmitButton"] button').forEach((btn) => {
+      form.querySelectorAll('[data-testid="stFormSubmitButton"] button').forEach((btn) => {
         btn.style.setProperty("border", "1px solid #cbd5e1", "important");
       });
     });

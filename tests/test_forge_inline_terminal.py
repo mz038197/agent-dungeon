@@ -47,3 +47,15 @@ def test_inline_terminal_css_uses_direct_child_block_selector() -> None:
         '> [data-testid="stVerticalBlock"]:has([data-forge-terminal'
     )
     assert broad_block not in css
+
+
+def test_inline_terminal_css_scopes_input_row_and_colors() -> None:
+    css = inline_terminal_css_block()
+    assert "data-forge-terminal-input" in css
+    assert "stHorizontalBlock" in css
+    assert '[data-baseweb="input"]:has(input:not(:disabled))' in css
+    assert "input:not(:disabled)" in css
+    assert "#f8fafc" in css
+    assert "skill-forge-band" not in css
+    assert '\n  .dungeon-col-center [data-testid="stForm"]' not in css
+    assert ":has([data-forge-terminal-input='inline']) [data-testid=\"stForm\"]" in css
