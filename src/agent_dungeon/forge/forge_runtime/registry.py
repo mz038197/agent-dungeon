@@ -32,7 +32,7 @@ def _brain_spec() -> RuntimeObjectSpec:
         export_filename="brain.py",
         platform_import="from agent_dungeon.forge.agent_runtime import get_brain_class",
         platform_binding=(
-            'Brain = get_brain_class(os.environ.get("AGENT_DUNGEON_USER_SUB") or None)'
+            'Brain = get_brain_class(google_sub=os.environ.get("AGENT_DUNGEON_USER_SUB") or None)'
         ),
         export_import="from runtime import Brain",
         render_standalone=render_standalone_brain_module,
@@ -117,7 +117,8 @@ _PLATFORM_HEADER_PATTERN = re.compile(
     r'^"""Agent Dungeon — 你的 Agent（agent\.py）"""\s*\n'
     r"(?:import os\s*\n)?"
     r"(?:from agent_dungeon\.forge\.agent_runtime import get_brain_class\s*\n)?"
-    r'(?:Brain = get_brain_class\(os\.environ\.get\("AGENT_DUNGEON_USER_SUB"\) or None\)\s*\n)?',
+    r'(?:Brain = get_brain_class\('
+    r'(?:google_sub=)?os\.environ\.get\("AGENT_DUNGEON_USER_SUB"\) or None\)\s*\n)?',
     re.MULTILINE,
 )
 

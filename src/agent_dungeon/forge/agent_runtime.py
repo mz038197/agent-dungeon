@@ -13,7 +13,7 @@ def runtime_google_sub() -> str | None:
     return raw or None
 
 
-def get_brain_class(*, google_sub: str | None = None) -> type:
+def get_brain_class(google_sub: str | None = None) -> type:
     """agent.py 頂部 import；子行程執行時由 AGENT_DUNGEON_USER_SUB 注入使用者。"""
     sub = google_sub if google_sub is not None else runtime_google_sub()
     return make_brain_class(google_sub=sub)
