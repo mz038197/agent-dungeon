@@ -62,6 +62,25 @@ def _status_label(status: ModuleStatus) -> str:
     return "未解鎖"
 
 
+def _status_pill_class(status: ModuleStatus) -> str:
+    if status == ModuleStatus.IN_PROGRESS:
+        return "in-progress"
+    if status == ModuleStatus.COMPLETE:
+        return "complete"
+    return "locked"
+
+
+def _module_row_marker_class(*, status: ModuleStatus, is_current: bool) -> str:
+    classes = ["dungeon-module-row-marker"]
+    if status == ModuleStatus.IN_PROGRESS:
+        classes.append("dungeon-module-in-progress")
+    if is_current:
+        classes.append("dungeon-module-active")
+    if status == ModuleStatus.LOCKED:
+        classes.append("dungeon-module-locked")
+    return " ".join(classes)
+
+
 def _page_exists(relative_page: str) -> bool:
     return (APP_ROOT / relative_page).is_file()
 
@@ -155,28 +174,30 @@ def render_left_sidebar(*, current_module: ModuleId | None, progress: DungeonPro
             status in (ModuleStatus.IN_PROGRESS, ModuleStatus.COMPLETE)
             and _page_exists(item.page)
         )
-        row_class = "dungeon-module-row"
-        if is_current:
-            row_class += " dungeon-module-active"
-        if status == ModuleStatus.LOCKED:
-            row_class += " dungeon-module-locked"
+        marker_class = _module_row_marker_class(status=status, is_current=is_current)
+        module_title = f"{item.label} Lv.{level_num}"
+        pill = _status_label(status)
+        pill_class = _status_pill_class(status)
 
         cols = st.columns([1, 3, 3])
-        cols[0].markdown(f"<span class='dungeon-module-icon'>{item.icon}</span>", unsafe_allow_html=True)
-        cols[1].markdown(
-            f"<div class='dungeon-module-name'>{item.label} Lv.{level_num}</div>",
+        cols[0].markdown(
+            (
+                f"<span class='{marker_class}' aria-hidden='true'></span>"
+                f"<span class='dungeon-module-icon'>{item.icon}</span>"
+            ),
             unsafe_allow_html=True,
         )
-        pill = _status_label(status)
         if clickable:
-            with cols[2]:
-                if st.button(pill, key=f"nav_module_{item.id}", use_container_width=True):
-                    st.switch_page(dungeon_file_page(item.page))
+            cols[1].page_link(dungeon_file_page(item.page), label=module_title)
         else:
-            cols[2].markdown(
-                f"<span class='dungeon-module-pill locked'>{pill}</span>",
+            cols[1].markdown(
+                f"<div class='dungeon-module-name'>{html.escape(module_title)}</div>",
                 unsafe_allow_html=True,
             )
+        cols[2].markdown(
+            f"<span class='dungeon-module-pill {pill_class}'>{html.escape(pill)}</span>",
+            unsafe_allow_html=True,
+        )
 
     st.markdown("#### 背包 (Inventory)")
     st.markdown(

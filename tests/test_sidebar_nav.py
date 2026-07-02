@@ -2,7 +2,21 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from agent_dungeon.core.progress import ModuleStatus
 from agent_dungeon.ui.shell_ui import discover_file_pages, navigation_page_path, page_url_from_relative_page
+from agent_dungeon.ui.sidebar_nav import _status_label, _status_pill_class
+
+
+def test_status_label_for_each_module_status() -> None:
+    assert _status_label(ModuleStatus.IN_PROGRESS) == "進行中"
+    assert _status_label(ModuleStatus.COMPLETE) == "已完成"
+    assert _status_label(ModuleStatus.LOCKED) == "未解鎖"
+
+
+def test_status_pill_class_for_each_module_status() -> None:
+    assert _status_pill_class(ModuleStatus.IN_PROGRESS) == "in-progress"
+    assert _status_pill_class(ModuleStatus.COMPLETE) == "complete"
+    assert _status_pill_class(ModuleStatus.LOCKED) == "locked"
 
 
 def test_navigation_page_path_uses_posix_slashes() -> None:
