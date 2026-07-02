@@ -105,7 +105,12 @@ def _brain_source_from_agent_py(agent_py: Path) -> str:
 def _stdout_contains_input_echo(stdout: str, stdin_value: str) -> bool:
     if not stdin_value.strip():
         return False
-    return any(line.strip() == stdin_value.strip() for line in stdout.splitlines())
+    needle = stdin_value.strip()
+    for line in stdout.splitlines():
+        stripped = line.strip()
+        if stripped == needle or stripped.endswith(needle):
+            return True
+    return False
 
 
 def _terminal_stdout(session: AgentTerminalSession | None) -> str:

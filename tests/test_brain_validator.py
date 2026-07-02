@@ -67,6 +67,16 @@ def test_brain_c1_passes(tmp_path: Path) -> None:
     assert result.ok is True
 
 
+def test_brain_c1_passes_when_prompt_glued_to_print(tmp_path: Path) -> None:
+    agent_py = _write_agent_py(tmp_path, _C1_MAIN)
+    session = _session_with_input(
+        stdout="你想問什麼？ Python 是什麼？\n",
+        input_line="Python 是什麼？",
+    )
+    result = validate_brain_challenge("c1", agent_py, session=session)
+    assert result.ok is True
+
+
 def test_brain_c2_passes_without_terminal(tmp_path: Path) -> None:
     agent_py = _write_agent_py(tmp_path, _C2_MAIN)
     result = validate_brain_challenge("c2", agent_py, session=None)
