@@ -15,7 +15,7 @@ from agent_dungeon.core.progress import (
 )
 from agent_dungeon.forge.agent_py_store import write_loop_module_body
 from agent_dungeon.forge.challenges import LOOP_FORGE_CHALLENGES, ForgeChallenge
-from agent_dungeon.forge.forge_terminal_ui import render_agent_terminal
+from agent_dungeon.forge.forge_terminal_ui import render_forge_inline_terminal
 from agent_dungeon.forge.loop_validator import validate_loop_challenge
 from agent_dungeon.forge.skill_forge_ui import (
     COLLAPSE_BUTTON_LABEL,
@@ -91,7 +91,7 @@ def _render_loop_challenge_card(
         session_key = f"{LOOP_FORGE_CONFIG_PREFIX}_{challenge.id}_terminal"
         terminal_session = None
         if google_sub is not None and not done:
-            terminal_session = render_agent_terminal(
+            terminal_session = render_forge_inline_terminal(
                 session_key=session_key,
                 agent_py=agent_py,
                 google_sub=google_sub,

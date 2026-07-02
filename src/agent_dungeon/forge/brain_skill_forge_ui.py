@@ -16,7 +16,7 @@ from agent_dungeon.core.progress import (
 from agent_dungeon.forge.agent_py_store import write_agent_main_body
 from agent_dungeon.forge.brain_validator import validate_brain_challenge
 from agent_dungeon.forge.challenges import BRAIN_FORGE_CHALLENGES, ForgeChallenge
-from agent_dungeon.forge.forge_terminal_ui import render_agent_terminal
+from agent_dungeon.forge.forge_terminal_ui import render_forge_inline_terminal
 from agent_dungeon.forge.skill_forge_ui import (
     SkillForgeConfig,
     _challenge_unlocked,
@@ -41,10 +41,6 @@ BRAIN_FORGE_CONFIG = SkillForgeConfig(
     reward_ready="Brain 技能已就緒",
     reward_pending="完成三關 Skill Forge 後顯示獎勵",
 )
-
-_BRAIN_TERMINAL_CAPTION = "按執行後，在執行結果框內 prompt 後輸入；Enter 送出。⏹ 可強制結束。"
-
-
 def _sync_brain_to_agent_py(
     google_sub: str,
     code: str,
@@ -106,18 +102,11 @@ def _render_brain_challenge_card(
         session_key = f"{BRAIN_FORGE_CONFIG_PREFIX}_{challenge.id}_terminal"
         terminal_session = None
         if google_sub is not None and not done:
-            terminal_session = render_agent_terminal(
+            terminal_session = render_forge_inline_terminal(
                 session_key=session_key,
                 agent_py=agent_py,
                 google_sub=google_sub,
                 disabled=done,
-                start_button_label="▶ 執行",
-                stop_button_label="⏹ 結束",
-                title="執行結果",
-                caption_text=_BRAIN_TERMINAL_CAPTION,
-                input_mode="form",
-                show_turn_count=False,
-                layout="inline" if challenge.id == "c1" else "split",
             )
 
         if not done and st.button(

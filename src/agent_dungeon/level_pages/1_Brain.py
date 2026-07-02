@@ -45,7 +45,7 @@ from agent_dungeon.forge.agent_py_store import (
 from agent_dungeon.forge.brain_skill_forge_ui import render_brain_skill_forge
 from agent_dungeon.forge.brain_validator import validate_brain_forge_lab
 from agent_dungeon.forge.forge_session import clear_forge_level_session
-from agent_dungeon.forge.forge_terminal_ui import render_agent_terminal
+from agent_dungeon.forge.forge_terminal_ui import render_forge_inline_terminal
 from agent_dungeon.forge.challenges import (
     BRAIN_FORGE_CHALLENGES,
     BRAIN_LEGACY_LAB_CODE,
@@ -439,17 +439,11 @@ def render_level(progress: DungeonProgress) -> str:
 
             lab_terminal_session = None
             if google_sub is not None and agent_file is not None and not lab_done:
-                lab_terminal_session = render_agent_terminal(
+                lab_terminal_session = render_forge_inline_terminal(
                     session_key="brain_forge_lab_terminal",
                     agent_py=agent_file,
                     google_sub=google_sub,
                     disabled=lab_done,
-                    start_button_label="▶ 執行",
-                    stop_button_label="⏹ 結束",
-                    title="執行結果",
-                    caption_text="按執行後，在下方輸入；Enter 送出。⏹ 可強制結束。",
-                    input_mode="form",
-                    show_turn_count=False,
                 )
 
             if st.button(

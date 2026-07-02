@@ -50,7 +50,7 @@ from agent_dungeon.forge.challenges import (
     loop_challenge_codes_from_stored,
     resolve_stored_lab_code,
 )
-from agent_dungeon.forge.forge_terminal_ui import render_agent_terminal
+from agent_dungeon.forge.forge_terminal_ui import render_forge_inline_terminal
 from agent_dungeon.forge.loop_skill_forge_ui import render_loop_skill_forge
 from agent_dungeon.forge.loop_validator import validate_loop_forge_lab
 from agent_dungeon.ui.dungeon_shell import dungeon_shell
@@ -331,7 +331,7 @@ def render_level(progress: DungeonProgress) -> str:
 
             terminal_session = None
             if google_sub is not None and agent_file is not None:
-                terminal_session = render_agent_terminal(
+                terminal_session = render_forge_inline_terminal(
                     session_key="loop_forge_lab_terminal",
                     agent_py=agent_file,
                     google_sub=google_sub,
