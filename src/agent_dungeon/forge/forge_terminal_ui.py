@@ -37,29 +37,53 @@ _PROCESSING_PLACEHOLDER = "Brain 思考中…"
 
 _INLINE_TERMINAL_CSS = """
 <style>
+.forge-terminal-inline-form {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+.forge-terminal-inline-form [data-testid="stForm"] {
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+}
+.forge-terminal-inline-form [data-testid="stVerticalBlock"] {
+  gap: 0 !important;
+}
+.forge-terminal-inline-form [data-testid="stElementContainer"] {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
 .forge-terminal-inline-form [data-testid="column"] {
   padding-top: 0 !important;
   padding-bottom: 0 !important;
 }
-.forge-terminal-inline-form pre {
-  margin: 0;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 14px;
-  line-height: 1.5;
-  white-space: pre-wrap;
+.forge-terminal-inline-form [data-testid="stTextInput"] {
+  margin-bottom: 0 !important;
 }
-.forge-terminal-inline-form [data-testid="stFormSubmitButton"] {
-  display: none;
+.forge-terminal-inline-form [data-testid="stTextInput"] > div {
+  margin-bottom: 0 !important;
+}
+.forge-terminal-inline-form [data-testid="stFormSubmitButton"] button {
+  min-height: 2.4rem;
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
 }
 [data-testid="stVerticalBlockBorderWrapper"]:has(.forge-terminal-inline-root) [data-testid="stCode"] {
   max-width: 100%;
   overflow-x: auto;
+  margin-bottom: 0.35rem !important;
 }
 [data-testid="stVerticalBlockBorderWrapper"]:has(.forge-terminal-inline-root) [data-testid="stCode"] pre,
 [data-testid="stVerticalBlockBorderWrapper"]:has(.forge-terminal-inline-root) [data-testid="stCode"] code {
   white-space: pre-wrap !important;
   word-break: break-word !important;
   overflow-wrap: anywhere !important;
+}
+[data-testid="stVerticalBlockBorderWrapper"]:has(.forge-terminal-inline-root) > div {
+  padding-top: 0.5rem !important;
+  padding-bottom: 0.5rem !important;
 }
 </style>
 """
@@ -249,14 +273,21 @@ def _render_prompt_input_inline(
 
     st.markdown('<div class="forge-terminal-inline-form">', unsafe_allow_html=True)
     with st.form(key=f"{session_key}_inline_form", clear_on_submit=True, border=False):
-        line = st.text_input(
-            "輸入",
-            key=f"{session_key}_input_line",
-            disabled=input_disabled,
-            placeholder=placeholder,
-            label_visibility="collapsed",
-        )
-        submitted = st.form_submit_button("送出", disabled=input_disabled)
+        input_col, btn_col = st.columns([5, 1], gap="small", vertical_alignment="bottom")
+        with input_col:
+            line = st.text_input(
+                "輸入",
+                key=f"{session_key}_input_line",
+                disabled=input_disabled,
+                placeholder=placeholder,
+                label_visibility="collapsed",
+            )
+        with btn_col:
+            submitted = st.form_submit_button(
+                "送出",
+                disabled=input_disabled,
+                use_container_width=True,
+            )
     st.markdown("</div>", unsafe_allow_html=True)
 
     if submitted and str(line).strip() and not input_disabled:
