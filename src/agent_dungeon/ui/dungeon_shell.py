@@ -623,6 +623,12 @@ _DUNGEON_INNER_CSS = """
     border-radius: 8px;
     color: #e2e8f0 !important;
   }
+  [data-testid="stVerticalBlockBorderWrapper"]:has(.forge-terminal-inline-root) [data-testid="stCode"] pre,
+  [data-testid="stVerticalBlockBorderWrapper"]:has(.forge-terminal-inline-root) [data-testid="stCode"] code {
+    white-space: pre-wrap !important;
+    word-break: break-word !important;
+    overflow-wrap: anywhere !important;
+  }
   .dungeon-col-center [data-testid="stCode"] pre span {
     color: #e2e8f0 !important;
     background-color: transparent !important;

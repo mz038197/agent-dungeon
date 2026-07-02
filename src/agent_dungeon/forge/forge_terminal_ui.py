@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import html
 from pathlib import Path
 from typing import Literal
 
@@ -15,7 +14,10 @@ from agent_dungeon.forge.agent_terminal import (
     start_agent,
     stop_agent,
 )
-from agent_dungeon.forge.forge_terminal_html import split_stdout_pending_prompt
+from agent_dungeon.forge.forge_terminal_html import (
+    normalize_inline_terminal_stdout,
+    split_stdout_pending_prompt,
+)
 
 _SESSION_KEY = "forge_terminal_session"
 _OUTPUT_KEY = "forge_terminal_output"
@@ -28,6 +30,8 @@ _AWAITING_KEY = "forge_terminal_awaiting_input"
 _PROCESSING_KEY = "forge_terminal_processing"
 _OUTPUT_SNAPSHOT_KEY = "forge_terminal_output_snapshot"
 _PROCESSING_PROMPT_KEY = "forge_terminal_processing_prompt"
+_WAS_RUNNING_KEY = "forge_terminal_was_running"
+_LAST_SUBMIT_KEY = "forge_terminal_last_submit"
 
 _PROCESSING_PLACEHOLDER = "Brain 思考中…"
 
@@ -46,6 +50,16 @@ _INLINE_TERMINAL_CSS = """
 }
 .forge-terminal-inline-form [data-testid="stFormSubmitButton"] {
   display: none;
+}
+[data-testid="stVerticalBlockBorderWrapper"]:has(.forge-terminal-inline-root) [data-testid="stCode"] {
+  max-width: 100%;
+  overflow-x: auto;
+}
+[data-testid="stVerticalBlockBorderWrapper"]:has(.forge-terminal-inline-root) [data-testid="stCode"] pre,
+[data-testid="stVerticalBlockBorderWrapper"]:has(.forge-terminal-inline-root) [data-testid="stCode"] code {
+  white-space: pre-wrap !important;
+  word-break: break-word !important;
+  overflow-wrap: anywhere !important;
 }
 </style>
 """
@@ -72,9 +86,29 @@ def poll_interval_for_terminal(
     awaiting_input: bool,
     running: bool,
 ) -> float | None:
-    if processing or (running and not awaiting_input):
+    del processing, awaiting_input
+    if running:
         return 0.2
     return None
+
+
+def should_handle_natural_exit(*, was_running: bool, live_running: bool) -> bool:
+    """程序自然結束（was_running 且本輪已不在跑）時應清理並刷新 UI。"""
+    return was_running and not live_running
+
+
+def should_rerun_on_natural_exit(*, was_running: bool, live_running: bool) -> bool:
+    """程序自然結束（was_running 且本輪已不在跑）時應 rerun 刷新外層 UI。"""
+    return should_handle_natural_exit(was_running=was_running, live_running=live_running)
+
+
+def _clear_inline_terminal_input_state(session_key: str) -> None:
+    st.session_state[_session_state_key(_AWAITING_KEY, session_key)] = False
+    st.session_state[_session_state_key(_PROMPT_KEY, session_key)] = ""
+    st.session_state[_session_state_key(_PROCESSING_KEY, session_key)] = False
+    st.session_state.pop(_session_state_key(_OUTPUT_SNAPSHOT_KEY, session_key), None)
+    st.session_state.pop(_session_state_key(_PROCESSING_PROMPT_KEY, session_key), None)
+    st.session_state.pop(_session_state_key(_LAST_SUBMIT_KEY, session_key), None)
 
 
 def get_terminal_session(session_key: str) -> AgentTerminalSession | None:
@@ -93,6 +127,8 @@ def clear_terminal_session(session_key: str) -> None:
     st.session_state.pop(_session_state_key(_PROCESSING_KEY, session_key), None)
     st.session_state.pop(_session_state_key(_OUTPUT_SNAPSHOT_KEY, session_key), None)
     st.session_state.pop(_session_state_key(_PROCESSING_PROMPT_KEY, session_key), None)
+    st.session_state.pop(_session_state_key(_WAS_RUNNING_KEY, session_key), None)
+    st.session_state.pop(_session_state_key(_LAST_SUBMIT_KEY, session_key), None)
 
 
 def _refresh_terminal_output(session_key: str, session: AgentTerminalSession | None) -> str:
@@ -100,6 +136,43 @@ def _refresh_terminal_output(session_key: str, session: AgentTerminalSession | N
         poll_output(session)
         st.session_state[_session_state_key(_OUTPUT_KEY, session_key)] = session.effective_output()
     return str(st.session_state.get(_session_state_key(_OUTPUT_KEY, session_key), ""))
+
+
+def _format_terminal_display(
+    stdout: str,
+    *,
+    session: AgentTerminalSession | None,
+    session_key: str,
+) -> str:
+    prompt_key = _session_state_key(_PROMPT_KEY, session_key)
+    processing_prompt_key = _session_state_key(_PROCESSING_PROMPT_KEY, session_key)
+    last_submit_key = _session_state_key(_LAST_SUBMIT_KEY, session_key)
+    prompt = str(
+        st.session_state.get(processing_prompt_key, "")
+        or st.session_state.get(prompt_key, "")
+    )
+    last_input = session.input_lines[-1] if session and session.input_lines else ""
+    last_submit = st.session_state.get(last_submit_key)
+    if isinstance(last_submit, dict):
+        if not prompt:
+            prompt = str(last_submit.get("prompt", ""))
+        if not last_input:
+            last_input = str(last_submit.get("input", ""))
+    return normalize_inline_terminal_stdout(stdout, prompt=prompt, last_input=last_input)
+
+
+def _render_inline_terminal_code(
+    text: str,
+    *,
+    session: AgentTerminalSession | None,
+    session_key: str,
+) -> None:
+    display = _format_terminal_display(text, session=session, session_key=session_key)
+    st.code(display.rstrip("\n"), language="text")
+
+
+def _render_inline_terminal_placeholder(message: str) -> None:
+    st.code(message, language="text")
 
 
 def _submit_terminal_input(
@@ -110,7 +183,12 @@ def _submit_terminal_input(
 ) -> None:
     prompt_key = _session_state_key(_PROMPT_KEY, session_key)
     processing_prompt_key = _session_state_key(_PROCESSING_PROMPT_KEY, session_key)
+    last_submit_key = _session_state_key(_LAST_SUBMIT_KEY, session_key)
     st.session_state[processing_prompt_key] = str(st.session_state.get(prompt_key, ""))
+    st.session_state[last_submit_key] = {
+        "prompt": str(st.session_state.get(prompt_key, "")),
+        "input": line.strip(),
+    }
     send_input(session, line)
     st.session_state[_session_state_key(_AWAITING_KEY, session_key)] = False
     st.session_state[prompt_key] = ""
@@ -143,6 +221,7 @@ def _render_terminal_controls(
             clear_terminal_session(session_key)
             session = start_agent(agent_py, google_sub=google_sub)
             st.session_state[_session_state_key(_SESSION_KEY, session_key)] = session
+            st.session_state[_session_state_key(_WAS_RUNNING_KEY, session_key)] = True
             st.rerun()
     with ctrl[1]:
         if st.button(
@@ -163,7 +242,6 @@ def _render_prompt_input_inline(
     *,
     session_key: str,
     session: AgentTerminalSession,
-    prompt: str,
     disabled: bool,
     placeholder: str = "在此輸入…",
 ) -> None:
@@ -171,26 +249,13 @@ def _render_prompt_input_inline(
 
     st.markdown('<div class="forge-terminal-inline-form">', unsafe_allow_html=True)
     with st.form(key=f"{session_key}_inline_form", clear_on_submit=True, border=False):
-        if prompt:
-            prompt_col, input_col = st.columns([1, 3], gap="small", vertical_alignment="center")
-            with prompt_col:
-                st.markdown(f"<pre>{html.escape(prompt)}</pre>", unsafe_allow_html=True)
-            with input_col:
-                line = st.text_input(
-                    "輸入",
-                    key=f"{session_key}_input_line",
-                    disabled=input_disabled,
-                    label_visibility="collapsed",
-                    placeholder=placeholder,
-                )
-        else:
-            line = st.text_input(
-                "輸入",
-                key=f"{session_key}_input_line",
-                disabled=input_disabled,
-                placeholder=placeholder,
-                label_visibility="collapsed",
-            )
+        line = st.text_input(
+            "輸入",
+            key=f"{session_key}_input_line",
+            disabled=input_disabled,
+            placeholder=placeholder,
+            label_visibility="collapsed",
+        )
         submitted = st.form_submit_button("送出", disabled=input_disabled)
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -255,11 +320,20 @@ def _render_inline_terminal_panel(
     processing_key = _session_state_key(_PROCESSING_KEY, session_key)
     snapshot_key = _session_state_key(_OUTPUT_SNAPSHOT_KEY, session_key)
     processing_prompt_key = _session_state_key(_PROCESSING_PROMPT_KEY, session_key)
+    was_running_key = _session_state_key(_WAS_RUNNING_KEY, session_key)
 
     if not running:
         st.session_state[awaiting_key] = False
         st.session_state[prompt_key] = ""
         st.session_state[processing_key] = False
+
+    if should_handle_natural_exit(
+        was_running=bool(st.session_state.get(was_running_key, False)),
+        live_running=running,
+    ):
+        _clear_inline_terminal_input_state(session_key)
+        st.session_state[was_running_key] = False
+        st.rerun()
 
     processing = bool(st.session_state.get(processing_key, False))
     if processing:
@@ -293,6 +367,10 @@ def _render_inline_terminal_panel(
         display_prompt = str(st.session_state.get(processing_prompt_key, display_prompt))
 
     with st.container(border=True):
+        st.markdown(
+            '<div class="forge-terminal-inline-root" aria-hidden="true"></div>',
+            unsafe_allow_html=True,
+        )
         @st.fragment(run_every=poll_interval)
         def _live_output() -> None:
             live_session = get_terminal_session(session_key)
@@ -322,16 +400,42 @@ def _render_inline_terminal_panel(
                     st.session_state[awaiting_key] = True
                     st.rerun()
 
+            if live_running:
+                st.session_state[was_running_key] = True
+            elif should_rerun_on_natural_exit(
+                was_running=bool(st.session_state.get(was_running_key, False)),
+                live_running=live_running,
+            ):
+                _clear_inline_terminal_input_state(session_key)
+                st.session_state[was_running_key] = False
+                st.rerun()
+
             if live_processing:
                 display = split_stdout_pending_prompt(live_output, awaiting_input=False)[0]
                 if display.strip():
-                    st.code(display.rstrip("\n"), language="text")
+                    _render_inline_terminal_code(
+                        display,
+                        session=live_session,
+                        session_key=session_key,
+                    )
                 else:
-                    st.code("（等待 Brain 回覆…）", language="text")
+                    _render_inline_terminal_placeholder("（等待 Brain 回覆…）")
             elif live_completed.strip():
-                st.code(live_completed.rstrip("\n"), language="text")
-            elif not live_running and not str(st.session_state.get(prompt_key, "")).strip():
-                st.code("（尚未啟動）", language="text")
+                _render_inline_terminal_code(
+                    live_completed,
+                    session=live_session,
+                    session_key=session_key,
+                )
+            elif not live_running:
+                exited_output = split_stdout_pending_prompt(live_output, awaiting_input=False)[0]
+                if exited_output.strip():
+                    _render_inline_terminal_code(
+                        exited_output,
+                        session=live_session,
+                        session_key=session_key,
+                    )
+                elif not str(st.session_state.get(prompt_key, "")).strip():
+                    _render_inline_terminal_placeholder("（尚未啟動）")
 
         _live_output()
 
@@ -344,7 +448,6 @@ def _render_inline_terminal_panel(
             _render_prompt_input_inline(
                 session_key=session_key,
                 session=live_session,
-                prompt=display_prompt if display_prompt.strip() else "",
                 disabled=disabled or live_processing,
                 placeholder=_PROCESSING_PLACEHOLDER if live_processing else "在此輸入…",
             )
@@ -418,6 +521,7 @@ def render_agent_terminal(
             clear_terminal_session(session_key)
             session = start_agent(agent_py, google_sub=google_sub)
             st.session_state[_session_state_key(_SESSION_KEY, session_key)] = session
+            st.session_state[_session_state_key(_WAS_RUNNING_KEY, session_key)] = True
             st.rerun()
     with ctrl[1]:
         if st.button(
