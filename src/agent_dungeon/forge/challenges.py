@@ -21,6 +21,11 @@ question = input("你想問什麼？ ")
 print(question)
 """.strip()
 
+_BRAIN_C1_HINT = """    # TODO: 用 input() 取得 question，再用 print 顯示
+    # Code Here #"""
+
+_EMPTY_MAIN = "def main():\n    pass"
+
 
 @dataclass(frozen=True)
 class ForgeChallenge:
@@ -110,9 +115,8 @@ BRAIN_FORGE_CHALLENGES: tuple[ForgeChallenge, ...] = (
         id="c1",
         label="Challenge 1",
         title="讀取使用者輸入",
-        default_code="""def main():
-    # TODO: 用 input() 取得 question，再用 print 顯示
-    # Code Here #
+        default_code=f"""def main():
+{_BRAIN_C1_HINT}
     pass""",
         editor_hint="在 main() 內用 input() 讀取問題，再用 print 顯示讀到的內容",
     ),
@@ -704,6 +708,31 @@ def challenge_codes_from_stored(
     return codes
 
 
+def _extract_main_indented_body(source: str) -> str:
+    from agent_dungeon.forge.agent_py_store import normalize_to_main_function, strip_if_name_guard_blocks
+
+    text = strip_if_name_guard_blocks(normalize_to_main_function(source.strip()))
+    lines = text.splitlines()
+    if not lines:
+        return ""
+    if lines[0].strip().startswith("def main"):
+        body_lines = lines[1:]
+        return "\n".join(body_lines).rstrip()
+    return "\n".join(f"    {line}" if line.strip() else "" for line in lines).rstrip()
+
+
+def _brain_c1_from_voice_seed(voice_seed: str) -> str:
+    seed = voice_seed.strip()
+    if not seed or seed.strip() == _EMPTY_MAIN:
+        return BRAIN_FORGE_CHALLENGES[0].default_code
+
+    body = _extract_main_indented_body(seed)
+    if not body.strip() or body.strip() == "pass":
+        return BRAIN_FORGE_CHALLENGES[0].default_code
+
+    return f"def main():\n{_BRAIN_C1_HINT}\n{body}"
+
+
 def _carry_forward_brain_code(
     challenge: ForgeChallenge,
     *,
@@ -743,16 +772,18 @@ def brain_challenge_codes_from_stored(
     stored: dict | None,
     *,
     completed: dict[str, bool] | None = None,
+    voice_seed: str = "",
 ) -> dict[str, str]:
     done = completed or {}
     codes: dict[str, str] = {}
     prior = ""
     for challenge in BRAIN_FORGE_CHALLENGES:
-        default = (
-            _carry_forward_brain_code(challenge, prior_code=prior)
-            if prior
-            else challenge.default_code
-        )
+        if challenge.id == "c1" and not prior:
+            default = _brain_c1_from_voice_seed(voice_seed)
+        elif prior:
+            default = _carry_forward_brain_code(challenge, prior_code=prior)
+        else:
+            default = challenge.default_code
         stored_raw = stored.get(challenge.id) if isinstance(stored, dict) else None
         codes[challenge.id] = resolve_stored_brain_challenge_code(
             challenge,

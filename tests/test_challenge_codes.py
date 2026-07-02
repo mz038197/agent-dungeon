@@ -83,6 +83,36 @@ def test_c3_legacy_c2_answer_replaced_with_if_name_scaffold() -> None:
     assert LEGACY_ANSWER_CODES["c3"] != codes["c3"]
 
 
+def test_brain_c1_default_from_voice_seed() -> None:
+    voice = """def main():
+    print("Hello")
+"""
+    codes = brain_challenge_codes_from_stored(None, completed={}, voice_seed=voice)
+    assert 'print("Hello")' in codes["c1"]
+    assert "input()" in codes["c1"]
+    assert codes["c1"].index("TODO") < codes["c1"].index('print("Hello")')
+
+
+def test_brain_c1_empty_voice_seed_uses_default() -> None:
+    codes = brain_challenge_codes_from_stored(None, completed={}, voice_seed="")
+    assert codes["c1"] == BRAIN_FORGE_CHALLENGES[0].default_code
+    assert "pass" in codes["c1"]
+
+
+def test_brain_c1_stored_old_default_refreshes_with_voice_seed() -> None:
+    stored = {"c1": BRAIN_FORGE_CHALLENGES[0].default_code}
+    voice = """def main():
+    print("Hello")
+"""
+    codes = brain_challenge_codes_from_stored(
+        stored,
+        completed={"c1": False},
+        voice_seed=voice,
+    )
+    assert 'print("Hello")' in codes["c1"]
+    assert "TODO" in codes["c1"]
+
+
 def test_brain_c2_carry_forward_uses_session_c1_when_stored_default() -> None:
     c1_code = 'question = input("q")\nprint(question)'
     stored = {"c1": BRAIN_FORGE_CHALLENGES[0].default_code, "c2": BRAIN_FORGE_CHALLENGES[1].default_code}
