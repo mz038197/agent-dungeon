@@ -16,8 +16,6 @@ def _bootstrap_pkg_path() -> None:
 
 _bootstrap_pkg_path()
 
-from dataclasses import replace
-
 import streamlit as st
 
 from agent_dungeon.auth.session import get_auth_user
@@ -34,7 +32,20 @@ from agent_dungeon.core.progress import (
     skill_forge_complete,
     voice_module_online,
 )
-from agent_dungeon.forge.brain_runner import run_brain_forge_lab_code
+from agent_dungeon.forge.agent_py_store import (
+    agent_py_path,
+    ensure_agent_py,
+    migrate_page_data_to_agent_py,
+    read_agent_main_body,
+    sanitize_agent_py_if_needed,
+    sync_voice_forge_challenge_to_agent_py,
+    write_agent_main_body,
+    write_module_section,
+)
+from agent_dungeon.forge.brain_skill_forge_ui import render_brain_skill_forge
+from agent_dungeon.forge.brain_validator import validate_brain_forge_lab
+from agent_dungeon.forge.forge_session import clear_forge_level_session
+from agent_dungeon.forge.forge_terminal_ui import render_agent_terminal
 from agent_dungeon.forge.challenges import (
     BRAIN_FORGE_CHALLENGES,
     BRAIN_LEGACY_LAB_CODE,
@@ -46,7 +57,6 @@ from agent_dungeon.forge.challenges import (
     resolve_stored_lab_code,
 )
 from agent_dungeon.forge.code_checks import has_brain_constructor, has_input_call
-from agent_dungeon.forge.skill_forge_ui import BRAIN_FORGE_CONFIG, render_skill_forge
 from agent_dungeon.ui.dungeon_shell import dungeon_shell
 from agent_dungeon.ui.mission_complete_ui import render_mission_complete_banner
 from agent_dungeon.ui.section_heading_ui import render_level_heading, render_numbered_section_heading
@@ -94,6 +104,11 @@ def _load_brain_page_data(google_sub: str | None) -> dict:
     return load_page_data(PAGE_NAME)
 
 
+def _voice_seed(google_sub: str, progress: DungeonProgress) -> str:
+    migrate_page_data_to_agent_py(google_sub, progress=progress)
+    return read_agent_main_body(google_sub, progress=progress)
+
+
 def _brain_session_code_overrides() -> dict[str, str]:
     overrides: dict[str, str] = {}
     for challenge in BRAIN_FORGE_CHALLENGES:
@@ -106,7 +121,12 @@ def _brain_session_code_overrides() -> dict[str, str]:
     return overrides
 
 
-def _challenge_codes_from_state(page_data: dict, progress: DungeonProgress) -> dict[str, str]:
+def _challenge_codes_from_state(
+    page_data: dict,
+    progress: DungeonProgress,
+    *,
+    google_sub: str | None,
+) -> dict[str, str]:
     stored = page_data.get("challenges")
     completed = {
         challenge.id: challenge_complete(progress, challenge.id, level_id=BRAIN_LEVEL_ID)
@@ -117,7 +137,12 @@ def _challenge_codes_from_state(page_data: dict, progress: DungeonProgress) -> d
         session_overrides=_brain_session_code_overrides(),
         completed=completed,
     )
-    return brain_challenge_codes_from_stored(merged, completed=completed)
+    voice_seed = _voice_seed(google_sub, progress) if google_sub else ""
+    return brain_challenge_codes_from_stored(
+        merged,
+        completed=completed,
+        voice_seed=voice_seed,
+    )
 
 
 def _persist_forge_challenge_code(google_sub: str | None, challenge_id: str, code: str) -> None:
@@ -132,10 +157,43 @@ def _persist_forge_challenge_code(google_sub: str | None, challenge_id: str, cod
     save_page_data(PAGE_NAME, page_data)
 
 
-def _on_brain_challenge_complete(challenge_id: str, code: str) -> None:
+def _on_brain_sync(challenge_id: str, code: str) -> None:
     user = get_auth_user(st.session_state)
     google_sub = user.google_sub if user is not None else None
     _persist_forge_challenge_code(google_sub, challenge_id, code)
+
+
+def _make_brain_challenge_complete_handler(progress: DungeonProgress):
+    def _handler(challenge_id: str, code: str) -> None:
+        user = get_auth_user(st.session_state)
+        google_sub = user.google_sub if user is not None else None
+        _persist_forge_challenge_code(google_sub, challenge_id, code)
+        if google_sub is None:
+            return
+        sync_voice_forge_challenge_to_agent_py(google_sub, code, progress=progress)
+
+    return _handler
+
+
+def _ensure_brain_forge_session_clean(
+    challenge_codes: dict[str, str],
+    progress: DungeonProgress,
+) -> None:
+    """voice seed 或 carry-forward 模板變更時，清掉 Forge 編輯器 session 快取。"""
+    if brain_module_online(progress):
+        return
+    expected_c1 = challenge_codes.get("c1", "")
+    rev_key = "brain_forge_session_rev"
+    if st.session_state.get(rev_key) == expected_c1:
+        return
+    incomplete = [
+        challenge.id
+        for challenge in BRAIN_FORGE_CHALLENGES
+        if not challenge_complete(progress, challenge.id, level_id=BRAIN_LEVEL_ID)
+    ]
+    if incomplete:
+        clear_forge_level_session("brain_forge", incomplete)
+    st.session_state[rev_key] = expected_c1
 
 
 def _sync_forge_code_session(challenge_codes: dict[str, str], progress: DungeonProgress) -> None:
@@ -231,9 +289,11 @@ def _persist_brain_page_data(
         for challenge in BRAIN_FORGE_CHALLENGES
     }
     stored = page_data.get("challenges")
+    voice_seed = _voice_seed(google_sub, progress) if google_sub else ""
     codes = brain_challenge_codes_from_stored(
         stored if isinstance(stored, dict) else None,
         completed=completed,
+        voice_seed=voice_seed,
     )
     stdout_map: dict[str, str] = {}
     for challenge in BRAIN_FORGE_CHALLENGES:
@@ -275,16 +335,22 @@ def render_level(progress: DungeonProgress) -> str:
     forge_done = skill_forge_complete(progress, level_id=BRAIN_LEVEL_ID)
 
     page_data = _load_brain_page_data(google_sub)
-    challenge_codes = _challenge_codes_from_state(page_data, progress)
+    challenge_codes = _challenge_codes_from_state(page_data, progress, google_sub=google_sub)
+    _ensure_brain_forge_session_clean(challenge_codes, progress)
     _sync_forge_code_session(challenge_codes, progress)
-    challenge_stdout = _challenge_stdout_from_state(page_data)
     lab_code = _lab_code_from_state(page_data, lab_done=lab_done)
     _sync_lab_code_session(lab_code, lab_done=lab_done, forge_done=forge_done)
 
-    preview_state = dict(st.session_state.get("agent_column_preview") or {})
-    preview_state["brain_challenge_codes"] = challenge_codes
-    preview_state["brain_lab_code"] = lab_code
-    st.session_state["agent_column_preview"] = preview_state
+    agent_file = agent_py_path(google_sub) if google_sub else None
+
+    if google_sub is not None:
+        migrate_page_data_to_agent_py(google_sub, progress=progress)
+        ensure_agent_py(google_sub, progress=progress)
+        sanitize_agent_py_if_needed(google_sub, progress=progress)
+        st.session_state["agent_column_preview"] = {
+            "agent_py_path": str(agent_file),
+            "google_sub": google_sub,
+        }
 
     render_level_heading(2, BRAIN_LEVEL_SUBTITLE)
 
@@ -326,17 +392,17 @@ def render_level(progress: DungeonProgress) -> str:
             )
 
     render_numbered_section_heading(2, "SKILL FORGE", variant="blue")
-    brain_forge_config = replace(
-        BRAIN_FORGE_CONFIG,
-        on_challenge_complete=_on_brain_challenge_complete,
-    )
-    render_skill_forge(
-        progress,
-        google_sub=google_sub,
-        challenge_codes=challenge_codes,
-        challenge_stdout=challenge_stdout,
-        config=brain_forge_config,
-    )
+    if agent_file is not None:
+        render_brain_skill_forge(
+            progress,
+            google_sub=google_sub,
+            agent_py=agent_file,
+            challenge_codes=challenge_codes,
+            on_sync=_on_brain_sync,
+            on_challenge_complete=_make_brain_challenge_complete_handler(progress),
+        )
+    else:
+        render_dungeon_hint("請先登入以使用 Skill Forge。")
 
     render_numbered_section_heading(3, "🧪 FORGE LAB", variant="green")
     with st.container(border=True):
@@ -359,10 +425,6 @@ def render_level(progress: DungeonProgress) -> str:
                 "修改 **prompt**，打造不同角色（例如：英文助教、數學老師、旅遊顧問），"
                 "觀察 Brain 回答的差異。"
             )
-            st.text_input(
-                "執行時 input() 會讀這裡的值",
-                key="brain_forge_lab_stdin",
-            )
             code = st.text_area(
                 "你的程式碼（自己完成）",
                 value=lab_code,
@@ -372,21 +434,40 @@ def render_level(progress: DungeonProgress) -> str:
             )
             page_data["code"] = code if str(code).strip() else DEFAULT_LAB_CODE
 
-            if st.button("執行", type="primary", disabled=lab_done, key="brain_forge_run_btn"):
-                stdin_value = str(st.session_state.get("brain_forge_lab_stdin", ""))
-                result = run_brain_forge_lab_code(
-                    code,
-                    google_sub=google_sub,
-                    stdin_value=stdin_value,
-                    default_prompt=DEFAULT_LAB_PROMPT,
-                )
-                if result.ok:
-                    if google_sub is not None:
-                        from agent_dungeon.forge.agent_py_store import (
-                            migrate_page_data_to_agent_py,
-                            write_module_section,
-                        )
+            if google_sub is not None and agent_file is not None and not lab_done:
+                write_agent_main_body(google_sub, code, progress=progress)
 
+            lab_terminal_session = None
+            if google_sub is not None and agent_file is not None and not lab_done:
+                lab_terminal_session = render_agent_terminal(
+                    session_key="brain_forge_lab_terminal",
+                    agent_py=agent_file,
+                    google_sub=google_sub,
+                    disabled=lab_done,
+                    start_button_label="▶ 執行",
+                    stop_button_label="⏹ 結束",
+                    title="執行結果",
+                    caption_text="按執行後，在下方輸入；Enter 送出。⏹ 可強制結束。",
+                    input_mode="form",
+                    show_turn_count=False,
+                )
+
+            if st.button(
+                "完成 Forge Lab",
+                type="primary",
+                disabled=lab_done,
+                key="brain_forge_lab_confirm_btn",
+            ):
+                if google_sub is None or agent_file is None:
+                    st.error("請先登入。")
+                else:
+                    write_agent_main_body(google_sub, code, progress=progress)
+                    result = validate_brain_forge_lab(
+                        agent_file,
+                        session=lab_terminal_session,
+                        default_prompt=DEFAULT_LAB_PROMPT,
+                    )
+                    if result.ok:
                         migrate_page_data_to_agent_py(google_sub, progress=progress)
                         write_module_section(
                             google_sub,
@@ -396,13 +477,16 @@ def render_level(progress: DungeonProgress) -> str:
                         )
                         mark_brain_forge_lab_complete(progress)
                         save_user_progress(google_sub, progress)
-                    st.session_state[STDOUT_KEY] = result.stdout.strip()
-                    st.success("Forge Lab 通過！Brain 模組已上線。")
-                    st.rerun()
-                else:
-                    st.error(result.error or "執行失敗")
-                    if result.stdout.strip():
-                        st.code(result.stdout, language="text")
+                        if lab_terminal_session is not None:
+                            st.session_state[STDOUT_KEY] = lab_terminal_session.effective_output().strip()
+                        st.success("Forge Lab 通過！Brain 模組已上線。")
+                        st.rerun()
+                    else:
+                        st.error(result.error or "尚未達成 Forge Lab 條件")
+                        if lab_terminal_session is not None:
+                            preview = lab_terminal_session.effective_output().strip()
+                            if preview:
+                                st.code(preview, language="text")
 
             preview = st.session_state.get(STDOUT_KEY, page_data.get("lab_stdout", ""))
             if lab_done and preview:

@@ -6,7 +6,6 @@ from dataclasses import dataclass
 import streamlit as st
 
 from agent_dungeon.forge.challenges import (
-    BRAIN_FORGE_CHALLENGES,
     ForgeChallenge,
     VOICE_FORGE_CHALLENGES,
     forge_editor_code_needs_refresh,
@@ -17,7 +16,6 @@ from agent_dungeon.ui.shell_ui import (
     render_skill_forge_note,
     render_skill_forge_summary,
 )
-from agent_dungeon.forge.brain_runner import run_brain_forge_challenge
 from agent_dungeon.forge.runner import ForgeRunResult, run_forge_challenge
 from agent_dungeon.core.progress import (
     BRAIN_LEVEL_ID,
@@ -58,17 +56,6 @@ VOICE_FORGE_CONFIG = SkillForgeConfig(
     caption="跟著老師，一步步打造 Voice 技能！",
     reward_ready="Voice 技能已就緒",
     reward_pending="完成三關 Skill Forge 後顯示獎勵",
-)
-
-BRAIN_FORGE_CONFIG = SkillForgeConfig(
-    level_id=BRAIN_LEVEL_ID,
-    key_prefix="brain_forge",
-    challenges=BRAIN_FORGE_CHALLENGES,
-    caption="跟著老師，一步步替 Agent 裝上 Brain！",
-    reward_ready="Brain 技能已就緒",
-    reward_pending="完成三關 Skill Forge 後顯示獎勵",
-    stdin_label="執行時 input() 會讀這裡的值",
-    run_challenge=run_brain_forge_challenge,
 )
 
 

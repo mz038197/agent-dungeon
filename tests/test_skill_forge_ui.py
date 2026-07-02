@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from agent_dungeon.core.progress import BRAIN_LEVEL_ID
 from agent_dungeon.forge.challenges import BRAIN_FORGE_CHALLENGES, VOICE_FORGE_CHALLENGES
+from agent_dungeon.forge.brain_skill_forge_ui import BRAIN_FORGE_CONFIG
 from agent_dungeon.forge.skill_forge_ui import (
-    BRAIN_FORGE_CONFIG,
     is_awaiting_collapse,
     review_code_for_completed,
 )
