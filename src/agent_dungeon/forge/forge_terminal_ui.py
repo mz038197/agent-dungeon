@@ -14,10 +14,12 @@ from agent_dungeon.forge.agent_terminal import (
     start_agent,
     stop_agent,
 )
+from agent_dungeon.forge.forge_terminal_css import inline_terminal_css_block
 from agent_dungeon.forge.forge_terminal_html import (
     normalize_inline_terminal_stdout,
     split_stdout_pending_prompt,
 )
+from agent_dungeon.ui.shell_ui import inject_css_block
 
 _SESSION_KEY = "forge_terminal_session"
 _OUTPUT_KEY = "forge_terminal_output"
@@ -34,68 +36,6 @@ _WAS_RUNNING_KEY = "forge_terminal_was_running"
 _LAST_SUBMIT_KEY = "forge_terminal_last_submit"
 
 _PROCESSING_PLACEHOLDER = "Brain 思考中…"
-
-_INLINE_TERMINAL_CSS = """
-<style>
-.forge-terminal-inline-form {
-  margin: 0 !important;
-  padding: 0 !important;
-}
-.forge-terminal-input-block {
-  margin: 0 !important;
-  padding: 0 !important;
-}
-.forge-terminal-inline-form [data-testid="stForm"] {
-  margin: 0 !important;
-  padding: 0 !important;
-  border: none !important;
-}
-.forge-terminal-inline-form [data-testid="stVerticalBlock"] {
-  gap: 0 !important;
-}
-.forge-terminal-input-block [data-testid="stElementContainer"],
-.forge-terminal-inline-form [data-testid="stElementContainer"] {
-  margin-top: 0 !important;
-  margin-bottom: 0 !important;
-  padding-top: 0 !important;
-  padding-bottom: 0 !important;
-}
-.forge-terminal-inline-form [data-testid="column"] {
-  padding-top: 0 !important;
-  padding-bottom: 0 !important;
-}
-.forge-terminal-inline-form [data-testid="stTextInput"] input {
-  min-height: 2rem !important;
-  padding-top: 0.35rem !important;
-  padding-bottom: 0.35rem !important;
-}
-.forge-terminal-inline-form [data-testid="stFormSubmitButton"] button {
-  min-height: 2rem !important;
-  padding-top: 0.35rem !important;
-  padding-bottom: 0.35rem !important;
-}
-.forge-terminal-inline-form [data-testid="stForm"] [data-testid="stCaptionContainer"] {
-  display: none !important;
-}
-[data-testid="stVerticalBlockBorderWrapper"]:has(.forge-terminal-inline-root) [data-testid="stVerticalBlock"] {
-  gap: 0.25rem !important;
-}
-[data-testid="stVerticalBlockBorderWrapper"]:has(.forge-terminal-inline-root) [data-testid="stCode"] {
-  max-width: 100%;
-  overflow-x: auto;
-}
-[data-testid="stVerticalBlockBorderWrapper"]:has(.forge-terminal-inline-root) [data-testid="stCode"] pre,
-[data-testid="stVerticalBlockBorderWrapper"]:has(.forge-terminal-inline-root) [data-testid="stCode"] code {
-  white-space: pre-wrap !important;
-  word-break: break-word !important;
-  overflow-wrap: anywhere !important;
-}
-[data-testid="stVerticalBlockBorderWrapper"]:has(.forge-terminal-inline-root) > div {
-  padding-top: 0.35rem !important;
-  padding-bottom: 0.35rem !important;
-}
-</style>
-"""
 
 
 def _session_state_key(base: str, session_key: str) -> str:
@@ -426,7 +366,7 @@ def _render_inline_terminal_panel(
 
     with st.container(border=True):
         st.markdown(
-            '<div class="forge-terminal-inline-root" aria-hidden="true"></div>',
+            '<div data-forge-terminal="inline" aria-hidden="true"></div>',
             unsafe_allow_html=True,
         )
         output_slot = st.empty()
@@ -517,7 +457,7 @@ def render_agent_terminal(
     st.caption(caption_text)
 
     if layout == "inline":
-        st.markdown(_INLINE_TERMINAL_CSS, unsafe_allow_html=True)
+        inject_css_block(inline_terminal_css_block(), element_id="forge-terminal-inline-css")
 
     session = get_terminal_session(session_key)
     _refresh_terminal_output(session_key, session)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from agent_dungeon.forge.forge_terminal_css import inline_terminal_css_block
 from agent_dungeon.forge.forge_terminal_ui import (
     _FORGE_INLINE_CAPTION,
     render_forge_inline_terminal,
@@ -36,3 +37,13 @@ def test_render_forge_inline_terminal_delegates_to_inline_layout(monkeypatch) ->
 def test_forge_inline_caption_is_stable() -> None:
     assert "Enter" in _FORGE_INLINE_CAPTION
     assert render_agent_terminal is not None
+
+
+def test_inline_terminal_css_uses_direct_child_block_selector() -> None:
+    css = inline_terminal_css_block()
+    assert ':has(> [data-testid="stElementContainer"]:has([data-forge-terminal' in css
+    assert ':has([data-forge-terminal' in css
+    broad_block = (
+        '> [data-testid="stVerticalBlock"]:has([data-forge-terminal'
+    )
+    assert broad_block not in css
