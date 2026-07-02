@@ -160,6 +160,16 @@ def unified_terminal_display_text(
     return stdout.rstrip("\n")
 
 
+def should_show_inline_terminal_panel(
+    *,
+    output: str,
+    running: bool,
+    processing: bool,
+) -> bool:
+    """Forge inline terminal：按執行後或已有 stdout 才顯示輸出區。"""
+    return running or processing or bool(output.strip())
+
+
 def _render_unified_terminal_output(display: str, *, placeholder: str = "（尚未啟動）") -> None:
     st.code(display.rstrip("\n") if display.strip() else placeholder, language="text")
 
@@ -364,6 +374,13 @@ def _render_inline_terminal_panel(
     if processing:
         display_prompt = str(st.session_state.get(processing_prompt_key, display_prompt))
 
+    if not should_show_inline_terminal_panel(
+        output=output,
+        running=running,
+        processing=processing,
+    ):
+        return
+
     with st.container(border=True):
         st.markdown(
             '<div data-forge-terminal="inline" aria-hidden="true"></div>',
@@ -418,9 +435,9 @@ def _render_inline_terminal_panel(
                 live_running=live_running,
             )
             with output_slot.container():
-                if display.strip() or not live_running:
+                if display.strip():
                     _render_unified_terminal_output(display)
-                elif live_running:
+                else:
                     output_slot.empty()
 
         _live_output()
