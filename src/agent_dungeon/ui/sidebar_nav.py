@@ -72,8 +72,6 @@ def _status_pill_class(status: ModuleStatus) -> str:
 
 def _module_row_marker_class(*, status: ModuleStatus, is_current: bool) -> str:
     classes = ["dungeon-module-row-marker"]
-    if status == ModuleStatus.IN_PROGRESS:
-        classes.append("dungeon-module-in-progress")
     if is_current:
         classes.append("dungeon-module-active")
     if status == ModuleStatus.LOCKED:

@@ -184,11 +184,11 @@ _DUNGEON_INNER_CSS = """
     color: #ffffff !important;
     text-decoration: underline !important;
   }
-  .dungeon-col-sidebar [data-testid="stHorizontalBlock"]:has(.dungeon-module-in-progress)
+  .dungeon-col-sidebar [data-testid="stHorizontalBlock"]:has(.dungeon-module-active)
     .dungeon-module-name,
-  .dungeon-col-sidebar [data-testid="stHorizontalBlock"]:has(.dungeon-module-in-progress)
+  .dungeon-col-sidebar [data-testid="stHorizontalBlock"]:has(.dungeon-module-active)
     a.dungeon-module-name-link,
-  .dungeon-col-sidebar [data-testid="stHorizontalBlock"]:has(.dungeon-module-in-progress)
+  .dungeon-col-sidebar [data-testid="stHorizontalBlock"]:has(.dungeon-module-active)
     a.dungeon-module-name-link:visited {
     color: #ffffff !important;
   }
@@ -199,10 +199,8 @@ _DUNGEON_INNER_CSS = """
     border-radius: 10px;
     border: 1px solid transparent;
   }
-  .dungeon-col-sidebar [data-testid="stHorizontalBlock"]:has(.dungeon-module-in-progress) {
+  .dungeon-col-sidebar [data-testid="stHorizontalBlock"]:has(.dungeon-module-active) {
     background: rgba(139, 92, 246, 0.18);
-  }
-  .dungeon-col-sidebar [data-testid="stHorizontalBlock"]:has(.dungeon-module-active.dungeon-module-in-progress) {
     border-color: rgba(167, 139, 250, 0.55);
   }
   .dungeon-col-sidebar [data-testid="stHorizontalBlock"]:has(.dungeon-module-row-marker)
