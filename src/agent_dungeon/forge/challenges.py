@@ -98,17 +98,12 @@ VOICE_FORGE_CHALLENGES: tuple[ForgeChallenge, ...] = (
     ),
 )
 
-_BRAIN_C2_SUFFIX = """    # --- 本關：建立 Brain（llm 放在 question 之前）---
-    # llm = Brain(model="...")
-    # Code Here #"""
+_BRAIN_C2_SUFFIX = """    # --- 本關：建立 Brain（llm 放在 question 之前）---"""
 
 _BRAIN_C2_LEGACY_ANSWER = f"""    # --- 本關：建立 Brain（llm 放在 question 之前）---
     llm = Brain(model="{DEFAULT_BRAIN_MODEL}")"""
 
-_BRAIN_C3_SUFFIX = """    # --- 本關：完成 Brain 安裝 ---
-    # response = llm.invoke(question)
-    # print(response)
-    # Code Here #"""
+_BRAIN_C3_SUFFIX = """    # --- 本關：完成 Brain 安裝 ---"""
 
 BRAIN_FORGE_CHALLENGES: tuple[ForgeChallenge, ...] = (
     ForgeChallenge(
@@ -745,6 +740,11 @@ def _carry_forward_brain_code(
         indented = "\n".join(f"    {line}" if line.strip() else "" for line in prior.splitlines())
         prior = f"def main():\n{indented}"
     suffix = challenge.default_code.strip()
+    if challenge.id == "c2":
+        body = _extract_main_indented_body(prior)
+        if not body.strip():
+            return f"def main():\n{suffix}"
+        return f"def main():\n{suffix}\n{body}"
     return f"{prior.rstrip()}\n{suffix}"
 
 

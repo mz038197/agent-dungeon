@@ -151,6 +151,7 @@ def test_brain_c2_stored_suffix_only_uses_carry_forward() -> None:
     assert 'input("q")' in codes["c2"]
     assert f'llm = Brain(model="{DEFAULT_BRAIN_MODEL}")' not in codes["c2"]
     assert "本關" in codes["c2"]
+    assert codes["c2"].index("本關") < codes["c2"].index("input(")
 
 
 def test_brain_c2_legacy_answer_replaced_with_comment_hint() -> None:
@@ -159,12 +160,12 @@ def test_brain_c2_legacy_answer_replaced_with_comment_hint() -> None:
     stored = {"c2": _BRAIN_C2_LEGACY_ANSWER}
     codes = brain_challenge_codes_from_stored(stored, completed={"c2": False})
     assert f'llm = Brain(model="{DEFAULT_BRAIN_MODEL}")' not in codes["c2"]
-    assert "llm" in codes["c2"]
+    assert "本關：建立 Brain" in codes["c2"]
 
 
 def test_brain_c3_stored_suffix_only_uses_carry_forward() -> None:
-    c1_code = 'question = input("q")\nprint(question)'
-    c2_code = f'{c1_code}\n\nllm = Brain(model="{DEFAULT_BRAIN_MODEL}")'
+    c1_code = 'def main():\n    question = input("q")\n    print(question)'
+    c2_code = f'{c1_code}\n    llm = Brain(model="{DEFAULT_BRAIN_MODEL}")'
     stored = {
         "c1": c1_code,
         "c2": c2_code,
@@ -176,9 +177,12 @@ def test_brain_c3_stored_suffix_only_uses_carry_forward() -> None:
     )
     assert has_input_call(codes["c3"])
     assert has_brain_constructor(codes["c3"])
-    assert "invoke" in codes["c3"]
-    assert c1_code in codes["c3"] or 'input("q")' in codes["c3"]
+    assert "invoke(" not in codes["c3"]
+    assert "Code Here" not in codes["c3"]
+    assert 'input("q")' in codes["c3"]
     assert f'llm = Brain(model="{DEFAULT_BRAIN_MODEL}")' in codes["c3"]
+    assert "本關：完成 Brain 安裝" in codes["c3"]
+    assert codes["c3"].index("llm = Brain") < codes["c3"].index("完成 Brain 安裝")
 
 
 def test_brain_c3_comment_template_still_needs_carry_forward() -> None:
@@ -212,7 +216,8 @@ def test_brain_cascade_prior_not_broken_by_bad_c2_stored() -> None:
         completed={"c1": True, "c2": False, "c3": False},
     )
     assert 'input("q")' in codes["c2"]
-    assert "invoke" in codes["c3"]
+    assert "本關：完成 Brain 安裝" in codes["c3"]
+    assert "invoke(" not in codes["c3"]
     assert has_input_call(codes["c3"])
 
 
