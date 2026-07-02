@@ -204,6 +204,70 @@ _DUNGEON_INNER_CSS = """
     border-color: rgba(167, 139, 250, 0.55);
   }
   .dungeon-col-sidebar [data-testid="stHorizontalBlock"]:has(.dungeon-module-row-marker)
+    [data-testid="stPageLink"] {
+    width: 100%;
+  }
+  .dungeon-col-sidebar [data-testid="stHorizontalBlock"]:has(.dungeon-module-row-marker)
+    [data-testid="stPageLink-NavLink"] {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    width: 100% !important;
+    white-space: nowrap;
+    font-size: 0.9rem !important;
+    font-weight: 600 !important;
+    color: #f8fafc !important;
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    text-decoration: none !important;
+    box-shadow: none !important;
+  }
+  .dungeon-col-sidebar [data-testid="stHorizontalBlock"]:has(.dungeon-module-row-marker)
+    [data-testid="stPageLink-NavLink"] span,
+  .dungeon-col-sidebar [data-testid="stHorizontalBlock"]:has(.dungeon-module-row-marker)
+    [data-testid="stPageLink-NavLink"] p,
+  .dungeon-col-sidebar [data-testid="stHorizontalBlock"]:has(.dungeon-module-row-marker)
+    [data-testid="stPageLink"] [data-testid="stMarkdownContainer"],
+  .dungeon-col-sidebar [data-testid="stHorizontalBlock"]:has(.dungeon-module-row-marker)
+    [data-testid="stPageLink"] [data-testid="stMarkdownContainer"] p {
+    color: #f8fafc !important;
+    -webkit-text-fill-color: #f8fafc !important;
+    background: transparent !important;
+  }
+  .dungeon-col-sidebar [data-testid="stHorizontalBlock"]:has(.dungeon-module-row-marker)
+    [data-testid="stPageLink-NavLink"]:hover {
+    color: #ffffff !important;
+    text-decoration: underline !important;
+    background: transparent !important;
+  }
+  .dungeon-col-sidebar [data-testid="stHorizontalBlock"]:has(.dungeon-module-row-marker)
+    [data-testid="stPageLink-NavLink"]:hover span,
+  .dungeon-col-sidebar [data-testid="stHorizontalBlock"]:has(.dungeon-module-row-marker)
+    [data-testid="stPageLink-NavLink"]:hover p,
+  .dungeon-col-sidebar [data-testid="stHorizontalBlock"]:has(.dungeon-module-row-marker)
+    [data-testid="stPageLink"]:hover [data-testid="stMarkdownContainer"],
+  .dungeon-col-sidebar [data-testid="stHorizontalBlock"]:has(.dungeon-module-row-marker)
+    [data-testid="stPageLink"]:hover [data-testid="stMarkdownContainer"] p {
+    color: #ffffff !important;
+    -webkit-text-fill-color: #ffffff !important;
+  }
+  .dungeon-col-sidebar [data-testid="stHorizontalBlock"]:has(.dungeon-module-active)
+    [data-testid="stPageLink-NavLink"],
+  .dungeon-col-sidebar [data-testid="stHorizontalBlock"]:has(.dungeon-module-active)
+    [data-testid="stPageLink-NavLink"] span,
+  .dungeon-col-sidebar [data-testid="stHorizontalBlock"]:has(.dungeon-module-active)
+    [data-testid="stPageLink-NavLink"] p,
+  .dungeon-col-sidebar [data-testid="stHorizontalBlock"]:has(.dungeon-module-active)
+    [data-testid="stPageLink"] [data-testid="stMarkdownContainer"],
+  .dungeon-col-sidebar [data-testid="stHorizontalBlock"]:has(.dungeon-module-active)
+    [data-testid="stPageLink"] [data-testid="stMarkdownContainer"] p {
+    color: #ffffff !important;
+    -webkit-text-fill-color: #ffffff !important;
+  }
+  .dungeon-col-sidebar [data-testid="stHorizontalBlock"]:has(.dungeon-module-row-marker)
     [data-testid="stColumn"]:nth-child(3) [data-testid="stMarkdownContainer"] {
     text-align: right;
   }
@@ -257,7 +321,8 @@ _DUNGEON_INNER_CSS = """
     width: 100%;
   }
   .dungeon-col-sidebar [data-testid="stLinkButton"] a,
-  .dungeon-col-sidebar [data-testid="stPageLink"] a {
+  .dungeon-col-sidebar [data-testid="stHorizontalBlock"]:not(:has(.dungeon-module-row-marker))
+    [data-testid="stPageLink-NavLink"] {
     display: inline-flex !important;
     align-items: center;
     justify-content: center;
@@ -273,7 +338,8 @@ _DUNGEON_INNER_CSS = """
     box-sizing: border-box;
   }
   .dungeon-col-sidebar [data-testid="stLinkButton"] a:hover,
-  .dungeon-col-sidebar [data-testid="stPageLink"] a:hover {
+  .dungeon-col-sidebar [data-testid="stHorizontalBlock"]:not(:has(.dungeon-module-row-marker))
+    [data-testid="stPageLink-NavLink"]:hover {
     color: #0f172a !important;
     background-color: #e2e8f0 !important;
     border-color: rgba(148, 163, 184, 0.55) !important;

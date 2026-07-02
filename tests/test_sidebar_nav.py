@@ -36,3 +36,16 @@ def test_discover_file_pages_includes_voice_with_relative_ref() -> None:
     assert navigation_page_path(brain.relative_to(app_root).as_posix()) == "level_pages/1_Brain.py"
     loop = next(path for path in pages if path.name == "2_Loop.py")
     assert navigation_page_path(loop.relative_to(app_root).as_posix()) == "level_pages/2_Loop.py"
+
+
+def test_sidebar_nav_uses_page_link_not_raw_href() -> None:
+    source = (
+        Path(__file__).resolve().parent.parent
+        / "src"
+        / "agent_dungeon"
+        / "ui"
+        / "sidebar_nav.py"
+    ).read_text(encoding="utf-8")
+    assert "st.page_link" in source
+    assert "dungeon-module-name-link" not in source
+    assert "page_url_from_relative_page" not in source

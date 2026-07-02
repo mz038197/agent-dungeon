@@ -10,7 +10,7 @@ import streamlit as st
 from agent_dungeon.auth.session import clear_auth, get_auth_user
 from agent_dungeon.core.cloud_paths import APP_ROOT
 from agent_dungeon.core.progress import DungeonProgress, ModuleStatus, agent_level_view, is_dungeon_graduated, load_user_progress
-from agent_dungeon.ui.shell_ui import overview_page, page_url_from_relative_page
+from agent_dungeon.ui.shell_ui import dungeon_file_page, overview_page
 
 ModuleId = Literal[
     "voice", "brain", "loop", "memory", "identity", "tools", "planning", "team"
@@ -186,15 +186,12 @@ def render_left_sidebar(*, current_module: ModuleId | None, progress: DungeonPro
             unsafe_allow_html=True,
         )
         if clickable:
-            page_href = page_url_from_relative_page(item.page)
-            cols[1].markdown(
-                (
-                    f"<a class='dungeon-module-name dungeon-module-name-link' "
-                    f"href='{html.escape(page_href, quote=True)}'>"
-                    f"{html.escape(module_title)}</a>"
-                ),
-                unsafe_allow_html=True,
-            )
+            with cols[1]:
+                st.page_link(
+                    dungeon_file_page(item.page),
+                    label=module_title,
+                    use_container_width=True,
+                )
         else:
             cols[1].markdown(
                 f"<div class='dungeon-module-name'>{html.escape(module_title)}</div>",

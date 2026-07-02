@@ -24,6 +24,8 @@ def test_dungeon_shell_css_includes_module_status_pills_and_row_highlight() -> N
     assert ":has(.dungeon-module-active)" in css
     assert "dungeon-module-name-link" in css
     assert ":has(.dungeon-module-row-marker)" in css
+    assert "stPageLink-NavLink" in css
+    assert "#f8fafc !important" in css.split("stPageLink-NavLink")[1]
 
 
 def test_dungeon_shell_css_distinguishes_primary_and_secondary_buttons() -> None:
