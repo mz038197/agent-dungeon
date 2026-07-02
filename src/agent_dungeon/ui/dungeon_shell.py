@@ -171,11 +171,50 @@ _DUNGEON_INNER_CSS = """
   .dungeon-brand-icon { font-size: 1.5rem; }
   .dungeon-brand-title { font-weight: 800; font-size: 1rem; letter-spacing: 0.04em; color: #f8fafc; }
   .dungeon-brand-sub { color: rgba(248,250,252,0.65); font-size: 0.78rem; }
-  .dungeon-module-row { margin-bottom: 0.15rem; }
+  .dungeon-module-row-marker { display: none !important; }
   .dungeon-module-name { font-size: 0.9rem; font-weight: 600; color: #f1f5f9; }
+  .dungeon-col-sidebar [data-testid="stHorizontalBlock"]:has(.dungeon-module-row-marker) {
+    align-items: center;
+    margin-bottom: 0.2rem;
+    padding: 0.2rem 0.35rem;
+    border-radius: 10px;
+    border: 1px solid transparent;
+  }
+  .dungeon-col-sidebar [data-testid="stHorizontalBlock"]:has(.dungeon-module-in-progress) {
+    background: rgba(139, 92, 246, 0.18);
+  }
+  .dungeon-col-sidebar [data-testid="stHorizontalBlock"]:has(.dungeon-module-active.dungeon-module-in-progress) {
+    border-color: rgba(167, 139, 250, 0.55);
+  }
+  .dungeon-col-sidebar [data-testid="stHorizontalBlock"]:has(.dungeon-module-row-marker)
+    [data-testid="stColumn"]:nth-child(2) [data-testid="stPageLink"] a {
+    display: inline-flex !important;
+    width: auto !important;
+    justify-content: flex-start !important;
+    background: transparent !important;
+    border: none !important;
+    color: #f1f5f9 !important;
+    font-size: 0.9rem !important;
+    font-weight: 600 !important;
+    padding: 0 !important;
+    min-height: 0 !important;
+    border-radius: 0 !important;
+    text-decoration: none !important;
+  }
+  .dungeon-col-sidebar [data-testid="stHorizontalBlock"]:has(.dungeon-module-row-marker)
+    [data-testid="stColumn"]:nth-child(2) [data-testid="stPageLink"] a:hover {
+    background: transparent !important;
+    color: #e2e8f0 !important;
+    text-decoration: underline !important;
+    border: none !important;
+  }
+  .dungeon-col-sidebar [data-testid="stHorizontalBlock"]:has(.dungeon-module-row-marker)
+    [data-testid="stColumn"]:nth-child(3) [data-testid="stMarkdownContainer"] {
+    text-align: right;
+  }
   .dungeon-module-pill {
     display: inline-block; padding: 0.15rem 0.45rem; border-radius: 999px;
-    font-size: 0.72rem; background: rgba(139,92,246,0.35); color: #ddd6fe;
+    font-size: 0.72rem; font-weight: 600;
     white-space: nowrap;
   }
   [data-testid="stColumn"] [data-testid="stButton"] button {
@@ -297,6 +336,12 @@ _DUNGEON_INNER_CSS = """
   }
   .dungeon-module-pill.locked {
     background: rgba(148,163,184,0.2); color: rgba(226,232,240,0.9);
+  }
+  .dungeon-module-pill.in-progress {
+    background: rgba(59,130,246,0.28); color: #93c5fd;
+  }
+  .dungeon-module-pill.complete {
+    background: rgba(22,163,74,0.28); color: #86efac;
   }
   .dungeon-inventory {
     border: 1px solid rgba(148,163,184,0.25); border-radius: 12px;

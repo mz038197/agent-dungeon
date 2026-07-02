@@ -14,6 +14,18 @@ def test_multimodal_patch_includes_inner_observer_and_color_scheme() -> None:
     assert "color-scheme: light" in _MULTIMODAL_CHATINPUT_LIGHT_CSS
 
 
+def test_dungeon_shell_css_includes_module_status_pills_and_row_highlight() -> None:
+    repo_root = Path(__file__).resolve().parent.parent
+    css = (repo_root / "src" / "agent_dungeon" / "ui" / "dungeon_shell.py").read_text(
+        encoding="utf-8"
+    )
+    assert ".dungeon-module-pill.in-progress" in css
+    assert ".dungeon-module-pill.complete" in css
+    assert ".dungeon-module-in-progress" in css
+    assert ":has(.dungeon-module-row-marker)" in css
+    assert ":has(.dungeon-module-active.dungeon-module-in-progress)" in css
+
+
 def test_dungeon_shell_css_distinguishes_primary_and_secondary_buttons() -> None:
     repo_root = Path(__file__).resolve().parent.parent
     pkg_root = repo_root / "src" / "agent_dungeon"
