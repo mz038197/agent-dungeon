@@ -26,6 +26,7 @@ class AgentTerminalSession:
     state: TerminalState = TerminalState.IDLE
     exit_code: int | None = None
     turn_count: int = 0
+    input_lines: list[str] = field(default_factory=list)
     _reader_stop: threading.Event = field(default_factory=threading.Event, repr=False)
     _reader_thread: threading.Thread | None = field(default=None, repr=False)
 
@@ -111,6 +112,7 @@ def send_input(session: AgentTerminalSession, line: str) -> None:
     stripped = line.strip()
     if stripped and stripped.lower() != "bye":
         session.turn_count += 1
+        session.input_lines.append(stripped)
     session.process.stdin.write(line if line.endswith("\n") else line + "\n")
     session.process.stdin.flush()
 
