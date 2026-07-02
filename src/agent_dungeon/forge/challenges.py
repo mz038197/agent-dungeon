@@ -514,6 +514,51 @@ def resolve_stored_brain_challenge_code(
     return stored
 
 
+def _brain_model_literal(source: str) -> str | None:
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return None
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        if not isinstance(func, ast.Name) or func.id != "Brain":
+            continue
+        for keyword in node.keywords:
+            if keyword.arg == "model":
+                arg = keyword.value
+                if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+                    return arg.value
+        if node.args:
+            arg = node.args[0]
+            if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+                return arg.value
+    return None
+
+
+def _editor_ahead_of_expected(current: str, expected: str) -> bool:
+    cur = current.strip()
+    exp = expected.strip()
+    if not cur:
+        return False
+    if cur == exp:
+        return True
+    if has_input_call(cur) and not has_input_call(exp):
+        return True
+    if has_brain_constructor(cur) and not has_brain_constructor(exp):
+        return True
+    if _brain_model_literal(cur) and not _brain_model_literal(exp):
+        return True
+    if "invoke(" in cur.replace(" ", "") and "invoke(" not in exp.replace(" ", ""):
+        return True
+    if "while True" in cur and "while True" not in exp:
+        return True
+    if "break" in cur and "break" not in exp:
+        return True
+    return False
+
+
 def brain_editor_code_needs_refresh(
     challenge: ForgeChallenge,
     current: str,
@@ -526,8 +571,8 @@ def brain_editor_code_needs_refresh(
     stripped = current.strip()
     if not stripped:
         return True
-    if "#" not in stripped and challenge.id != "c1":
-        return True
+    if _editor_ahead_of_expected(stripped, expected.strip()):
+        return False
     return _brain_stored_needs_carry_forward(
         challenge,
         stripped,
@@ -754,16 +799,32 @@ def merge_brain_challenge_stored_with_session(
     session_overrides: dict[str, str] | None = None,
     completed: dict[str, bool] | None = None,
 ) -> dict | None:
-    """將已完成關卡的 session 編輯器內容合併進 stored，供 carry-forward 使用。"""
+    """將 Forge 編輯器 session 內容合併進 stored（含進行中關卡），供 carry-forward 使用。"""
+    _ = completed
     if not session_overrides:
         return stored if isinstance(stored, dict) else None
-    done = completed or {}
     merged = dict(stored) if isinstance(stored, dict) else {}
     for challenge in BRAIN_FORGE_CHALLENGES:
         raw = session_overrides.get(challenge.id)
-        if not isinstance(raw, str) or not raw.strip():
-            continue
-        if done.get(challenge.id, False):
+        if isinstance(raw, str) and raw.strip():
+            merged[challenge.id] = raw
+    return merged
+
+
+def merge_loop_challenge_stored_with_session(
+    stored: dict | None,
+    *,
+    session_overrides: dict[str, str] | None = None,
+    completed: dict[str, bool] | None = None,
+) -> dict | None:
+    """將 Loop Forge 編輯器 session 內容合併進 stored（含進行中關卡）。"""
+    _ = completed
+    if not session_overrides:
+        return stored if isinstance(stored, dict) else None
+    merged = dict(stored) if isinstance(stored, dict) else {}
+    for challenge in LOOP_FORGE_CHALLENGES:
+        raw = session_overrides.get(challenge.id)
+        if isinstance(raw, str) and raw.strip():
             merged[challenge.id] = raw
     return merged
 
