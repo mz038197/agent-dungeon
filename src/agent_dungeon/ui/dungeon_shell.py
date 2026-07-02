@@ -1190,38 +1190,32 @@ def dungeon_shell(
             st.error(f"關卡渲染錯誤：{exc}")
 
     preview_payload = st.session_state.get("agent_column_preview")
-    preview_codes: dict[str, str] = {}
-    preview_lab = ""
-    preview_brain_codes: dict[str, str] = {}
-    preview_brain_lab = ""
     preview_agent_py_path: str | None = None
+    preview_google_sub: str | None = None
     if isinstance(preview_payload, dict):
-        raw_codes = preview_payload.get("challenge_codes")
-        if isinstance(raw_codes, dict):
-            preview_codes = {str(k): str(v) for k, v in raw_codes.items()}
-        raw_lab = preview_payload.get("lab_code")
-        if isinstance(raw_lab, str):
-            preview_lab = raw_lab
-        raw_brain_codes = preview_payload.get("brain_challenge_codes")
-        if isinstance(raw_brain_codes, dict):
-            preview_brain_codes = {str(k): str(v) for k, v in raw_brain_codes.items()}
-        raw_brain_lab = preview_payload.get("brain_lab_code")
-        if isinstance(raw_brain_lab, str):
-            preview_brain_lab = raw_brain_lab
         raw_agent_py = preview_payload.get("agent_py_path")
         if isinstance(raw_agent_py, str) and raw_agent_py.strip():
             preview_agent_py_path = raw_agent_py.strip()
+        raw_sub = preview_payload.get("google_sub")
+        if isinstance(raw_sub, str) and raw_sub.strip():
+            preview_google_sub = raw_sub.strip()
+
+    user = get_auth_user(st.session_state)
+    if user is not None:
+        if preview_google_sub is None:
+            preview_google_sub = user.google_sub
+        if preview_agent_py_path is None:
+            from agent_dungeon.forge.agent_py_store import agent_py_path as resolve_agent_py_path
+
+            preview_agent_py_path = str(resolve_agent_py_path(user.google_sub))
 
     with right:
         render_agent_column(
             progress=progress,
             extra_context=extra_context,
             page_name=page_name,
-            challenge_codes=preview_codes,
-            lab_code=preview_lab,
-            brain_challenge_codes=preview_brain_codes,
-            brain_lab_code=preview_brain_lab,
             agent_py_path=preview_agent_py_path,
+            google_sub=preview_google_sub,
         )
 
     st.markdown('<div id="dungeon-footer-anchor"></div>', unsafe_allow_html=True)
