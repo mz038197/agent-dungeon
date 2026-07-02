@@ -4,9 +4,11 @@ from agent_dungeon.forge.challenges import (
     BRAIN_LEGACY_LAB_CODE,
     EMPTY_FORGE_LAB_CODE,
     VOICE_LEGACY_LAB_CODE,
+    brain_forge_lab_seed_code,
     resolve_stored_lab_code,
     voice_forge_lab_seed_code,
 )
+from agent_dungeon.forge.llm_provider import DEFAULT_BRAIN_MODEL
 
 
 def test_resolve_returns_empty_when_unstored() -> None:
@@ -75,3 +77,21 @@ if __name__ == "__main__":
     seed = voice_forge_lab_seed_code({"c3": c3})
     assert "再加一句自我介紹" in seed
     assert seed.count('print("Hello")') == 1
+
+
+def test_brain_forge_lab_seed_from_c3() -> None:
+    c3 = f'''def main():
+    question = input("你想問什麼？ ")
+    llm = Brain(model="{DEFAULT_BRAIN_MODEL}")
+    response = llm.invoke(question)
+    print(response)
+'''
+    seed = brain_forge_lab_seed_code({"c3": c3})
+    assert seed.strip() == c3.strip()
+    assert "invoke(" in seed
+    assert "Brain(" in seed
+
+
+def test_brain_forge_lab_seed_empty_without_c3() -> None:
+    assert brain_forge_lab_seed_code({}) == ""
+    assert brain_forge_lab_seed_code({"c1": 'def main():\n    pass'}) == ""

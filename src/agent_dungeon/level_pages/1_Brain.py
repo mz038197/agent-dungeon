@@ -52,6 +52,7 @@ from agent_dungeon.forge.challenges import (
     BRAIN_LEGACY_LAB_CODE,
     EMPTY_FORGE_LAB_CODE,
     brain_challenge_codes_from_stored,
+    brain_forge_lab_seed_code,
     challenge_code_for_persist,
     forge_editor_code_needs_refresh,
     merge_brain_challenge_stored_with_session,
@@ -250,10 +251,13 @@ def _sync_forge_code_session(challenge_codes: dict[str, str], progress: DungeonP
 def _sync_lab_code_session(lab_code: str, *, lab_done: bool, forge_done: bool) -> None:
     if not forge_done or lab_done:
         return
-    if st.session_state.get(LAB_CODE_KEY) is None or not str(
-        st.session_state.get(LAB_CODE_KEY, "")
-    ).strip():
+    current = str(st.session_state.get(LAB_CODE_KEY, ""))
+    if LAB_CODE_KEY not in st.session_state or not current.strip():
         st.session_state[LAB_CODE_KEY] = lab_code
+        return
+    if lab_code.strip() and current.strip() != lab_code.strip():
+        if not current.strip() or current.strip() == BRAIN_LEGACY_LAB_CODE.strip():
+            st.session_state[LAB_CODE_KEY] = lab_code
 
 
 def _challenge_stdout_from_state(page_data: dict) -> dict[str, str]:
@@ -267,13 +271,29 @@ def _challenge_stdout_from_state(page_data: dict) -> dict[str, str]:
     return stdout_map
 
 
-def _lab_code_from_state(page_data: dict, *, lab_done: bool) -> str:
+def _lab_code_from_state(
+    page_data: dict,
+    challenge_codes: dict[str, str],
+    *,
+    lab_done: bool,
+    forge_done: bool,
+) -> str:
     raw = page_data.get("code")
-    return resolve_stored_lab_code(
+    stored = resolve_stored_lab_code(
         raw if isinstance(raw, str) else None,
         legacy=BRAIN_LEGACY_LAB_CODE,
         lab_done=lab_done,
     )
+    if lab_done:
+        return stored
+    if forge_done:
+        draft = stored.strip()
+        if draft and draft != BRAIN_LEGACY_LAB_CODE.strip():
+            return stored
+        seed = brain_forge_lab_seed_code(challenge_codes)
+        if seed.strip():
+            return seed
+    return stored
 
 
 def _persist_brain_page_data(
@@ -314,7 +334,8 @@ def _persist_brain_page_data(
         page_data["lab_stdout"] = str(st.session_state[STDOUT_KEY])
     raw_lab = page_data.get("code")
     if isinstance(raw_lab, str) and not raw_lab.strip() and not lab_done:
-        page_data["code"] = DEFAULT_LAB_CODE
+        seed = brain_forge_lab_seed_code(codes)
+        page_data["code"] = seed if seed.strip() else DEFAULT_LAB_CODE
     save_page_data(PAGE_NAME, page_data)
 
 
@@ -339,7 +360,12 @@ def render_level(progress: DungeonProgress) -> str:
     challenge_codes = _challenge_codes_from_state(page_data, progress, google_sub=google_sub)
     _ensure_brain_forge_session_clean(challenge_codes, progress)
     _sync_forge_code_session(challenge_codes, progress)
-    lab_code = _lab_code_from_state(page_data, lab_done=lab_done)
+    lab_code = _lab_code_from_state(
+        page_data,
+        challenge_codes,
+        lab_done=lab_done,
+        forge_done=forge_done,
+    )
     _sync_lab_code_session(lab_code, lab_done=lab_done, forge_done=forge_done)
 
     agent_file = agent_py_path(google_sub) if google_sub else None

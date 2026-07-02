@@ -701,6 +701,31 @@ def voice_forge_lab_seed_code(challenge_codes: dict[str, str]) -> str:
     return ""
 
 
+def _brain_lab_seed_ready(source: str) -> bool:
+    stripped = source.strip()
+    if not stripped or not _voice_has_executable_main(stripped):
+        return False
+    if not has_input_call(stripped):
+        return False
+    if not has_brain_constructor(stripped):
+        return False
+    return "invoke(" in stripped.replace(" ", "")
+
+
+def brain_forge_lab_seed_code(challenge_codes: dict[str, str]) -> str:
+    c3 = challenge_codes.get("c3", "").strip()
+    if c3 and _brain_lab_seed_ready(c3):
+        return c3
+
+    c2 = challenge_codes.get("c2", "").strip()
+    if c2 and _voice_has_executable_main(c2):
+        merged = f"{c2.rstrip()}\n{_BRAIN_C3_SUFFIX.strip()}"
+        if _brain_lab_seed_ready(merged):
+            return merged
+
+    return ""
+
+
 def _carry_forward_voice_code(
     challenge: ForgeChallenge,
     *,
