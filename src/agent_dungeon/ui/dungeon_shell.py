@@ -172,7 +172,26 @@ _DUNGEON_INNER_CSS = """
   .dungeon-brand-title { font-weight: 800; font-size: 1rem; letter-spacing: 0.04em; color: #f8fafc; }
   .dungeon-brand-sub { color: rgba(248,250,252,0.65); font-size: 0.78rem; }
   .dungeon-module-row-marker { display: none !important; }
-  .dungeon-module-name { font-size: 0.9rem; font-weight: 600; color: #f1f5f9; }
+  .dungeon-module-name {
+    font-size: 0.9rem; font-weight: 600; color: #f8fafc;
+  }
+  a.dungeon-module-name-link,
+  a.dungeon-module-name-link:visited {
+    color: #f8fafc !important;
+    text-decoration: none !important;
+  }
+  a.dungeon-module-name-link:hover {
+    color: #ffffff !important;
+    text-decoration: underline !important;
+  }
+  .dungeon-col-sidebar [data-testid="stHorizontalBlock"]:has(.dungeon-module-in-progress)
+    .dungeon-module-name,
+  .dungeon-col-sidebar [data-testid="stHorizontalBlock"]:has(.dungeon-module-in-progress)
+    a.dungeon-module-name-link,
+  .dungeon-col-sidebar [data-testid="stHorizontalBlock"]:has(.dungeon-module-in-progress)
+    a.dungeon-module-name-link:visited {
+    color: #ffffff !important;
+  }
   .dungeon-col-sidebar [data-testid="stHorizontalBlock"]:has(.dungeon-module-row-marker) {
     align-items: center;
     margin-bottom: 0.2rem;
@@ -185,28 +204,6 @@ _DUNGEON_INNER_CSS = """
   }
   .dungeon-col-sidebar [data-testid="stHorizontalBlock"]:has(.dungeon-module-active.dungeon-module-in-progress) {
     border-color: rgba(167, 139, 250, 0.55);
-  }
-  .dungeon-col-sidebar [data-testid="stHorizontalBlock"]:has(.dungeon-module-row-marker)
-    [data-testid="stColumn"]:nth-child(2) [data-testid="stPageLink"] a {
-    display: inline-flex !important;
-    width: auto !important;
-    justify-content: flex-start !important;
-    background: transparent !important;
-    border: none !important;
-    color: #f1f5f9 !important;
-    font-size: 0.9rem !important;
-    font-weight: 600 !important;
-    padding: 0 !important;
-    min-height: 0 !important;
-    border-radius: 0 !important;
-    text-decoration: none !important;
-  }
-  .dungeon-col-sidebar [data-testid="stHorizontalBlock"]:has(.dungeon-module-row-marker)
-    [data-testid="stColumn"]:nth-child(2) [data-testid="stPageLink"] a:hover {
-    background: transparent !important;
-    color: #e2e8f0 !important;
-    text-decoration: underline !important;
-    border: none !important;
   }
   .dungeon-col-sidebar [data-testid="stHorizontalBlock"]:has(.dungeon-module-row-marker)
     [data-testid="stColumn"]:nth-child(3) [data-testid="stMarkdownContainer"] {
