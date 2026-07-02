@@ -41,6 +41,10 @@ _INLINE_TERMINAL_CSS = """
   margin: 0 !important;
   padding: 0 !important;
 }
+.forge-terminal-input-block {
+  margin: 0 !important;
+  padding: 0 !important;
+}
 .forge-terminal-inline-form [data-testid="stForm"] {
   margin: 0 !important;
   padding: 0 !important;
@@ -49,6 +53,7 @@ _INLINE_TERMINAL_CSS = """
 .forge-terminal-inline-form [data-testid="stVerticalBlock"] {
   gap: 0 !important;
 }
+.forge-terminal-input-block [data-testid="stElementContainer"],
 .forge-terminal-inline-form [data-testid="stElementContainer"] {
   margin-top: 0 !important;
   margin-bottom: 0 !important;
@@ -59,21 +64,25 @@ _INLINE_TERMINAL_CSS = """
   padding-top: 0 !important;
   padding-bottom: 0 !important;
 }
-.forge-terminal-inline-form [data-testid="stTextInput"] {
-  margin-bottom: 0 !important;
-}
-.forge-terminal-inline-form [data-testid="stTextInput"] > div {
-  margin-bottom: 0 !important;
+.forge-terminal-inline-form [data-testid="stTextInput"] input {
+  min-height: 2rem !important;
+  padding-top: 0.35rem !important;
+  padding-bottom: 0.35rem !important;
 }
 .forge-terminal-inline-form [data-testid="stFormSubmitButton"] button {
-  min-height: 2.4rem;
-  padding-top: 0.25rem;
-  padding-bottom: 0.25rem;
+  min-height: 2rem !important;
+  padding-top: 0.35rem !important;
+  padding-bottom: 0.35rem !important;
+}
+.forge-terminal-inline-form [data-testid="stForm"] [data-testid="stCaptionContainer"] {
+  display: none !important;
+}
+[data-testid="stVerticalBlockBorderWrapper"]:has(.forge-terminal-inline-root) [data-testid="stVerticalBlock"] {
+  gap: 0.25rem !important;
 }
 [data-testid="stVerticalBlockBorderWrapper"]:has(.forge-terminal-inline-root) [data-testid="stCode"] {
   max-width: 100%;
   overflow-x: auto;
-  margin-bottom: 0.35rem !important;
 }
 [data-testid="stVerticalBlockBorderWrapper"]:has(.forge-terminal-inline-root) [data-testid="stCode"] pre,
 [data-testid="stVerticalBlockBorderWrapper"]:has(.forge-terminal-inline-root) [data-testid="stCode"] code {
@@ -82,8 +91,8 @@ _INLINE_TERMINAL_CSS = """
   overflow-wrap: anywhere !important;
 }
 [data-testid="stVerticalBlockBorderWrapper"]:has(.forge-terminal-inline-root) > div {
-  padding-top: 0.5rem !important;
-  padding-bottom: 0.5rem !important;
+  padding-top: 0.35rem !important;
+  padding-bottom: 0.35rem !important;
 }
 </style>
 """
@@ -162,19 +171,13 @@ def _refresh_terminal_output(session_key: str, session: AgentTerminalSession | N
     return str(st.session_state.get(_session_state_key(_OUTPUT_KEY, session_key), ""))
 
 
-def _format_terminal_display(
-    stdout: str,
-    *,
+def _processing_prompt_and_input(
     session: AgentTerminalSession | None,
     session_key: str,
-) -> str:
-    prompt_key = _session_state_key(_PROMPT_KEY, session_key)
+) -> tuple[str, str]:
     processing_prompt_key = _session_state_key(_PROCESSING_PROMPT_KEY, session_key)
     last_submit_key = _session_state_key(_LAST_SUBMIT_KEY, session_key)
-    prompt = str(
-        st.session_state.get(processing_prompt_key, "")
-        or st.session_state.get(prompt_key, "")
-    )
+    prompt = str(st.session_state.get(processing_prompt_key, ""))
     last_input = session.input_lines[-1] if session and session.input_lines else ""
     last_submit = st.session_state.get(last_submit_key)
     if isinstance(last_submit, dict):
@@ -182,21 +185,43 @@ def _format_terminal_display(
             prompt = str(last_submit.get("prompt", ""))
         if not last_input:
             last_input = str(last_submit.get("input", ""))
-    return normalize_inline_terminal_stdout(stdout, prompt=prompt, last_input=last_input)
+    return prompt, last_input
 
 
-def _render_inline_terminal_code(
-    text: str,
+def unified_terminal_display_text(
+    stdout: str,
     *,
     session: AgentTerminalSession | None,
     session_key: str,
-) -> None:
-    display = _format_terminal_display(text, session=session, session_key=session_key)
-    st.code(display.rstrip("\n"), language="text")
+    processing: bool,
+    live_running: bool,
+) -> str:
+    """單一 inline terminal 輸出區的顯示文字。"""
+    if not live_running:
+        completed = split_stdout_pending_prompt(stdout, awaiting_input=False)[0]
+        return completed.rstrip("\n") if completed.strip() else ""
+
+    if processing:
+        prompt, last_input = _processing_prompt_and_input(session, session_key)
+        normalized = normalize_inline_terminal_stdout(
+            stdout,
+            prompt=prompt,
+            last_input=last_input,
+        )
+        if last_input:
+            submitted = f"{prompt}{last_input}"
+            submitted_alt = f"{prompt.rstrip()}{last_input}"
+            if submitted not in normalized and submitted_alt not in normalized:
+                trimmed = normalized.rstrip()
+                if trimmed.endswith(prompt.rstrip()) or trimmed.endswith(prompt):
+                    normalized = f"{trimmed}{last_input}"
+        return normalized.rstrip("\n")
+
+    return stdout.rstrip("\n")
 
 
-def _render_inline_terminal_placeholder(message: str) -> None:
-    st.code(message, language="text")
+def _render_unified_terminal_output(display: str, *, placeholder: str = "（尚未啟動）") -> None:
+    st.code(display.rstrip("\n") if display.strip() else placeholder, language="text")
 
 
 def _submit_terminal_input(
@@ -271,6 +296,7 @@ def _render_prompt_input_inline(
 ) -> None:
     input_disabled = disabled or not is_running(session)
 
+    st.markdown('<div class="forge-terminal-input-block">', unsafe_allow_html=True)
     st.markdown('<div class="forge-terminal-inline-form">', unsafe_allow_html=True)
     with st.form(key=f"{session_key}_inline_form", clear_on_submit=True, border=False):
         input_col, btn_col = st.columns([5, 1], gap="small", vertical_alignment="bottom")
@@ -288,6 +314,7 @@ def _render_prompt_input_inline(
                 disabled=input_disabled,
                 use_container_width=True,
             )
+    st.markdown("</div>", unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
     if submitted and str(line).strip() and not input_disabled:
@@ -402,6 +429,8 @@ def _render_inline_terminal_panel(
             '<div class="forge-terminal-inline-root" aria-hidden="true"></div>',
             unsafe_allow_html=True,
         )
+        output_slot = st.empty()
+
         @st.fragment(run_every=poll_interval)
         def _live_output() -> None:
             live_session = get_terminal_session(session_key)
@@ -420,7 +449,7 @@ def _render_inline_terminal_panel(
                     live_processing = False
 
             live_split_awaiting = live_running and not live_processing
-            live_completed, live_prompt = split_stdout_pending_prompt(
+            _, live_prompt = split_stdout_pending_prompt(
                 live_output,
                 awaiting_input=live_split_awaiting,
             )
@@ -441,32 +470,18 @@ def _render_inline_terminal_panel(
                 st.session_state[was_running_key] = False
                 st.rerun()
 
-            if live_processing:
-                display = split_stdout_pending_prompt(live_output, awaiting_input=False)[0]
-                if display.strip():
-                    _render_inline_terminal_code(
-                        display,
-                        session=live_session,
-                        session_key=session_key,
-                    )
-                else:
-                    _render_inline_terminal_placeholder("（等待 Brain 回覆…）")
-            elif live_completed.strip():
-                _render_inline_terminal_code(
-                    live_completed,
-                    session=live_session,
-                    session_key=session_key,
-                )
-            elif not live_running:
-                exited_output = split_stdout_pending_prompt(live_output, awaiting_input=False)[0]
-                if exited_output.strip():
-                    _render_inline_terminal_code(
-                        exited_output,
-                        session=live_session,
-                        session_key=session_key,
-                    )
-                elif not str(st.session_state.get(prompt_key, "")).strip():
-                    _render_inline_terminal_placeholder("（尚未啟動）")
+            display = unified_terminal_display_text(
+                live_output,
+                session=live_session,
+                session_key=session_key,
+                processing=live_processing,
+                live_running=live_running,
+            )
+            with output_slot.container():
+                if display.strip() or not live_running:
+                    _render_unified_terminal_output(display)
+                elif live_running:
+                    output_slot.empty()
 
         _live_output()
 
