@@ -57,9 +57,9 @@ def _poll_reader(session: AgentTerminalSession) -> None:
             if remaining:
                 session.stdout_buffer += remaining
             break
-        line = proc.stdout.readline()
-        if line:
-            session.stdout_buffer += line
+        chunk = proc.stdout.read(1)
+        if chunk:
+            session.stdout_buffer += chunk
         else:
             time.sleep(0.05)
     if proc.stderr is not None:
