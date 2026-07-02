@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from agent_dungeon.forge.forge_terminal_html import (
     build_terminal_srcdoc,
+    normalize_inline_terminal_stdout,
     split_stdout_pending_prompt,
     terminal_iframe_height,
 )
@@ -41,3 +42,35 @@ def test_terminal_iframe_height_scales() -> None:
     assert terminal_iframe_height("", has_prompt=False) >= 160
     tall = terminal_iframe_height("\n".join(f"line{i}" for i in range(20)), has_prompt=True)
     assert tall <= 320
+
+
+def test_normalize_inline_terminal_stdout_splits_glued_prompt_input_response() -> None:
+    raw = "你的問題：今天是禮拜幾抱歉，我無法得知今天的實際日期。\n- 查看手機"
+    out = normalize_inline_terminal_stdout(
+        raw,
+        prompt="你的問題：",
+        last_input="今天是禮拜幾",
+    )
+    assert out.startswith("你的問題：今天是禮拜幾\n抱歉，我無法得知今天的實際日期。")
+
+
+def test_normalize_inline_terminal_stdout_fallback_without_prompt() -> None:
+    raw = "Hello今天是禮拜幾world"
+    out = normalize_inline_terminal_stdout(raw, last_input="今天是禮拜幾")
+    assert out == "Hello今天是禮拜幾\nworld"
+
+
+def test_normalize_inline_terminal_stdout_prompt_only_splits_after_prompt() -> None:
+    raw = "你的問題：你好！我是 MiniMax"
+    out = normalize_inline_terminal_stdout(raw, prompt="你的問題：")
+    assert out == "你的問題：\n你好！我是 MiniMax"
+
+
+def test_normalize_inline_terminal_stdout_colon_equivalence() -> None:
+    raw = "你的問題: 你好你好！我是 MiniMax"
+    out = normalize_inline_terminal_stdout(
+        raw,
+        prompt="你的問題：",
+        last_input="你好",
+    )
+    assert out.startswith("你的問題: 你好\n")

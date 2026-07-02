@@ -4,6 +4,90 @@ import html
 import json
 
 
+def _normalize_colon(s: str) -> str:
+    return s.replace("：", ":")
+
+
+def _stdout_starts_with_prompt(stdout: str, prompt: str) -> bool:
+    if not prompt:
+        return False
+    if stdout.startswith(prompt):
+        return True
+    return _normalize_colon(stdout).startswith(_normalize_colon(prompt))
+
+
+def _prompt_prefix_len(stdout: str, prompt: str) -> int:
+    if stdout.startswith(prompt):
+        return len(prompt)
+    norm_stdout = _normalize_colon(stdout)
+    norm_prompt = _normalize_colon(prompt)
+    if norm_stdout.startswith(norm_prompt):
+        return len(prompt)
+    return -1
+
+
+def normalize_inline_terminal_stdout(
+    stdout: str,
+    *,
+    prompt: str = "",
+    last_input: str = "",
+) -> str:
+    """Display-only: input() 後 print() 常與 prompt+輸入黏同一行，插入虛擬換行以便 UI 換行。"""
+    if not stdout:
+        return stdout
+
+    if prompt and _stdout_starts_with_prompt(stdout, prompt):
+        prefix_len = _prompt_prefix_len(stdout, prompt)
+        if prefix_len > 0:
+            prefix = stdout[:prefix_len]
+            rest = stdout[prefix_len:]
+            if last_input and rest.startswith(last_input):
+                glued = prefix + last_input
+                tail = rest[len(last_input) :]
+                if tail and not tail.startswith("\n"):
+                    return f"{glued}\n{tail}"
+                return stdout
+            if not last_input and rest and not rest.startswith("\n"):
+                return f"{prefix}\n{rest}"
+
+    if not last_input:
+        return stdout
+
+    if prompt:
+        prefix = f"{prompt}{last_input}"
+        if stdout.startswith(prefix):
+            rest = stdout[len(prefix) :]
+            if rest and not rest.startswith("\n"):
+                return f"{prefix}\n{rest}"
+        norm_prefix = _normalize_colon(prefix)
+        norm_stdout = _normalize_colon(stdout)
+        if norm_stdout.startswith(norm_prefix):
+            # 還原切點：用 last_input 在 first line 的位置
+            first_nl = stdout.find("\n")
+            first_line = stdout if first_nl == -1 else stdout[:first_nl]
+            idx = first_line.find(last_input)
+            if idx != -1:
+                split_at = idx + len(last_input)
+                if split_at < len(first_line):
+                    new_first = first_line[:split_at] + "\n" + first_line[split_at:]
+                    if first_nl == -1:
+                        return new_first
+                    return new_first + stdout[first_nl:]
+
+    first_nl = stdout.find("\n")
+    first_line = stdout if first_nl == -1 else stdout[:first_nl]
+    idx = first_line.find(last_input)
+    if idx == -1:
+        return stdout
+    split_at = idx + len(last_input)
+    if split_at >= len(first_line):
+        return stdout
+    new_first = first_line[:split_at] + "\n" + first_line[split_at:]
+    if first_nl == -1:
+        return new_first
+    return new_first + stdout[first_nl:]
+
+
 def split_stdout_pending_prompt(stdout: str, *, awaiting_input: bool) -> tuple[str, str]:
     """將 stdout 拆成已完成輸出與 pending prompt（input 前常無換行）。"""
     if not awaiting_input or not stdout:
